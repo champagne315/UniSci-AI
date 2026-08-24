@@ -1,0 +1,19 @@
+# Secrets and persistent user data
+.env
+data/
+
+# Dependencies
+node_modules/
+
+# Runtime and browser-test artifacts
+*.log
+/*.err
+/*.yaml
+.playwright-cli/
+verify.png
+
+# One-off local helper files
+*.tmp
+*.tmp.js
+.tmp_save_agent.js
+

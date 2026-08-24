@@ -1,0 +1,717 @@
+/* UniSci AI — visual system rebuilt from Coboot玩法小Tip */
+:root {
+  --violet: #7c5cff;
+  --violet-dark: #6241ec;
+  --yellow: #f4ff72;
+  --ink: #17121f;
+  --ink-soft: #51495c;
+  --milk: #fffdf5;
+  --pink: #ff9dcf;
+  --cyan: #74e8e2;
+  --lavender: #e3d9ff;
+  --line: #17121f;
+  --grid-dot: #d5cced;
+  --sans: "Trebuchet MS", "Microsoft YaHei", "PingFang SC", sans-serif;
+  --r: 18px;
+  --shadow: 5px 5px 0 #17121f;
+  --shadow-lg: 10px 10px 0 #17121f;
+  --brand: var(--violet);
+  --brand-hover: var(--violet-dark);
+  --brand-deep: var(--violet-dark);
+  --brand-soft: var(--lavender);
+  --brand-soft-2: #cdbdff;
+  --brand-tint: rgba(124, 92, 255, .18);
+  --accent-yellow: var(--yellow);
+  --accent-cyan: var(--cyan);
+  --accent-pink: var(--pink);
+  --bg: var(--milk);
+  --surface: #fff;
+  --surface-2: #fffdf5;
+  --surface-3: #f1ecff;
+  --rail-bg: var(--violet);
+  --ink-2: var(--ink-soft);
+  --ink-3: #766e7f;
+  --ink-4: #b3abc1;
+  --line-2: #17121f;
+  --r-sm: 10px;
+  --r-lg: 18px;
+  --r-xl: 26px;
+  --r-full: 999px;
+  --sh-xs: 2px 2px 0 var(--ink);
+  --sh-sm: var(--shadow);
+  --sh-md: var(--shadow);
+  --sh-lg: var(--shadow-lg);
+}
+
+html, body { background: var(--violet); }
+body.coboot-skin {
+  padding: 0;
+  color: var(--ink);
+  background: var(--violet);
+  font-family: var(--sans);
+  font-weight: 600;
+  letter-spacing: -.012em;
+}
+body.coboot-skin::before { display: none; }
+body.coboot-skin * { scrollbar-color: var(--ink) var(--milk); scrollbar-width: thin; }
+body.coboot-skin button { font-family: inherit; font-weight: 900; border-radius: 999px; }
+body.coboot-skin button:hover { transform: translate(-2px, -2px); }
+body.coboot-skin button:active { transform: translate(1px, 1px); box-shadow: 1px 1px 0 var(--ink) !important; }
+body.coboot-skin input, body.coboot-skin textarea, body.coboot-skin select { font-family: inherit; font-weight: 650; }
+body.coboot-skin :focus-visible { outline: 4px solid var(--yellow); outline-offset: 3px; }
+body.coboot-skin ::selection { background: var(--yellow); color: var(--ink); }
+
+/* The original page has no ticker; explicitly remove every legacy ticker rule. */
+.coboot-ticker { display: none !important; }
+
+/* Login and first-use experience */
+body.coboot-skin .auth-gate,
+body.coboot-skin .onboarding {
+  background: var(--violet);
+  background-image: radial-gradient(rgba(255,255,255,.24) 1px, transparent 1px);
+  background-size: 18px 18px;
+}
+body.coboot-skin .auth-card {
+  background: var(--milk);
+  border: 3px solid var(--ink);
+  border-radius: 30px;
+  box-shadow: 13px 14px 0 var(--ink);
+}
+body.coboot-skin .auth-card::before { background: var(--yellow); border-bottom: 2px solid var(--ink); }
+body.coboot-skin .auth-brand img { background: transparent; border: 2px solid var(--ink); border-radius: 50%; }
+body.coboot-skin .auth-brand strong { color: var(--ink); font-size: 22px; font-weight: 900; }
+body.coboot-skin .auth-brand small { color: var(--ink-soft); font-weight: 700; }
+body.coboot-skin .auth-copy h1 { color: var(--ink); font-weight: 950; }
+body.coboot-skin .auth-switch { color: var(--violet-dark); text-decoration: underline; }
+body.coboot-skin .auth-card label > span { color: var(--ink); font-weight: 900; }
+body.coboot-skin .auth-card input {
+  border: 2px solid var(--ink); border-radius: 12px; background: #fff;
+  box-shadow: 2px 2px 0 var(--ink); color: var(--ink);
+}
+body.coboot-skin .auth-card input:focus { background: var(--yellow); box-shadow: 4px 4px 0 var(--ink); }
+body.coboot-skin .auth-submit,
+body.coboot-skin .onboarding-next {
+  border: 2px solid var(--ink); background: var(--yellow); color: var(--ink); box-shadow: var(--shadow);
+}
+body.coboot-skin .auth-submit:hover,
+body.coboot-skin .onboarding-next:hover { background: var(--pink); }
+body.coboot-skin .onboarding-shell { background: var(--violet); border: 0; }
+body.coboot-skin .onboarding-topbar,
+body.coboot-skin .onboarding-footer { background: var(--violet); border-color: rgba(255,255,255,.45); }
+body.coboot-skin .onboarding-brand strong,
+body.coboot-skin .onboarding-skip,
+body.coboot-skin .onboarding-footer > p { color: #fff; }
+body.coboot-skin .onboarding-brand > img { border-radius: 50%; border: 2px solid var(--ink); background: var(--milk); }
+body.coboot-skin .onboarding-progress > span { background: rgba(255,255,255,.35); height: 5px; }
+body.coboot-skin .onboarding-progress > span.active { background: var(--yellow); }
+body.coboot-skin .onboarding-progress em { color: var(--yellow); font-weight: 900; }
+body.coboot-skin .onboarding-skip:hover,
+body.coboot-skin .onboarding-back:hover { background: var(--yellow); color: var(--ink); }
+body.coboot-skin .onboarding-copy h1 { color: #fff; font-weight: 950; line-height: .99; }
+body.coboot-skin .onboarding-copy h1 span { color: var(--yellow); text-shadow: 4px 4px 0 var(--ink); }
+body.coboot-skin .onboarding-kicker { display: inline-block; padding: 7px 12px; background: var(--ink); color: var(--yellow); border-radius: 999px; font-weight: 900; transform: rotate(-2deg); }
+body.coboot-skin .onboarding-lead,
+body.coboot-skin .onboarding-facts span,
+body.coboot-skin .onboarding-facts strong { color: #fff; }
+body.coboot-skin .onboarding-facts { border-color: rgba(255,255,255,.46); }
+body.coboot-skin .onboarding-facts > div { border-color: rgba(255,255,255,.22); }
+body.coboot-skin .collab-scene,
+body.coboot-skin .knowledge-scene {
+  border: 3px solid var(--ink); border-radius: 32px; background: var(--milk);
+  box-shadow: 12px 14px 0 var(--ink);
+}
+body.coboot-skin .scene-caption,
+body.coboot-skin .knowledge-label { background: var(--milk); border-bottom: 2px solid var(--ink); color: var(--ink); font-weight: 900; }
+body.coboot-skin .scene-thread,
+body.coboot-skin .retrieval-result,
+body.coboot-skin .source-document.front { border: 2px solid var(--ink); box-shadow: 4px 4px 0 var(--ink); }
+body.coboot-skin .scene-avatar,
+body.coboot-skin .scene-worker > span,
+body.coboot-skin .result-answer i { background: var(--yellow); color: var(--ink); border: 2px solid var(--ink); }
+body.coboot-skin .scene-worker { border: 2px solid var(--ink); background: #fff; }
+body.coboot-skin .scene-worker.experiment,
+body.coboot-skin .scene-synthesis { background: var(--cyan); border-color: var(--ink); }
+body.coboot-skin .onboarding-back { color: #fff; }
+
+/* App shell: a violet station rail surrounding a paper workspace */
+body.coboot-skin #app { background: var(--violet); }
+body.coboot-skin .rail {
+  width: 94px; padding: 17px 10px 13px; gap: 12px; background: var(--violet);
+  border-right: 2px solid var(--ink);
+}
+body.coboot-skin .rail-nav { gap: 9px; padding: 0; }
+body.coboot-skin .rail-item {
+  padding: 10px 2px 9px; border: 2px solid transparent; border-radius: 15px; color: #fff;
+  background: transparent;
+}
+body.coboot-skin .rail-item svg { width: 22px; height: 22px; }
+body.coboot-skin .rail-item span { font-size: 11px; font-weight: 900; }
+body.coboot-skin .rail-item:hover { border-color: var(--ink); background: var(--pink); color: var(--ink); }
+body.coboot-skin .rail-item.active { color: var(--ink); background: var(--yellow); border-color: var(--ink); box-shadow: 4px 4px 0 var(--ink); }
+body.coboot-skin .rail-item.active::before { display: none; }
+body.coboot-skin .rail-foot { gap: 8px; padding: 0; }
+body.coboot-skin .rail-help {
+  width: 100%; margin: 0; padding: 8px 5px; background: #fff; color: var(--ink);
+  border: 2px solid var(--ink); border-radius: 999px; font-size: 10px; box-shadow: 3px 3px 0 var(--ink);
+}
+body.coboot-skin .rail-help:hover { background: var(--cyan); color: var(--ink); border-color: var(--ink); }
+
+/* Chat's two surfaces */
+body.coboot-skin .view-page,
+body.coboot-skin .center-panel { background: var(--milk); }
+body.coboot-skin .sidebar {
+  width: 300px; background: var(--milk); border-right: 2px solid var(--ink);
+}
+body.coboot-skin .sb-top { padding: 17px 16px 10px; }
+body.coboot-skin .search-box,
+body.coboot-skin .search-box.lg {
+  height: 40px; background: #fff; border: 2px solid var(--ink); border-radius: 999px; box-shadow: 3px 3px 0 var(--ink);
+}
+body.coboot-skin .search-box:focus-within { background: var(--yellow); box-shadow: 4px 4px 0 var(--ink); }
+body.coboot-skin .search-box svg { color: var(--ink); }
+body.coboot-skin .search-box input::placeholder { color: #756d7e; }
+body.coboot-skin .sb-add {
+  width: 40px; height: 40px; background: var(--yellow); color: var(--ink); border: 2px solid var(--ink);
+  border-radius: 50%; box-shadow: 3px 3px 0 var(--ink);
+}
+body.coboot-skin .sb-add:hover { background: var(--pink); color: var(--ink); }
+body.coboot-skin .sb-menu,
+body.coboot-skin .kb-pop,
+body.coboot-skin .mention-hint { background: #fff; border: 2px solid var(--ink); border-radius: 16px; box-shadow: var(--shadow-lg); }
+body.coboot-skin .sb-menu button:hover,
+body.coboot-skin .mention-hint .mh-item:hover,
+body.coboot-skin .mention-hint .mh-item.sel { background: var(--yellow); }
+body.coboot-skin .sb-menu svg { color: var(--violet); }
+body.coboot-skin .sb-filter { padding: 3px 16px 13px; border-bottom: 2px solid var(--ink); }
+body.coboot-skin .sf-chip,
+body.coboot-skin .cat-chip,
+body.coboot-skin .chip,
+body.coboot-skin .qm-chip,
+body.coboot-skin .kb-mount-btn,
+body.coboot-skin .ch-tag {
+  border: 1.5px solid var(--ink); background: #fff; color: var(--ink); border-radius: 999px; font-weight: 900;
+}
+body.coboot-skin .sf-chip.active,
+body.coboot-skin .cat-chip.active { background: var(--yellow); border-color: var(--ink); color: var(--ink); box-shadow: 2px 2px 0 var(--ink); }
+body.coboot-skin .conv-item { border: 2px solid transparent; border-radius: 14px; }
+body.coboot-skin .conv-item:hover { border-color: var(--ink); background: #fff; }
+body.coboot-skin .conv-item.active { background: var(--pink); border-color: var(--ink); box-shadow: 3px 3px 0 var(--ink); }
+body.coboot-skin .conv-item.active .ci-title { color: var(--ink); font-weight: 900; }
+body.coboot-skin .ci-avatar,
+body.coboot-skin .ch-avatar,
+body.coboot-skin .msg-avatar,
+body.coboot-skin .ac-avatar,
+body.coboot-skin .kc-icon { border: 2px solid var(--ink); box-shadow: 2px 2px 0 var(--ink); }
+body.coboot-skin .ci-kind,
+body.coboot-skin .ci-unread { border: 1px solid var(--ink); background: var(--cyan); color: var(--ink); font-weight: 900; }
+body.coboot-skin .ci-live { background: var(--yellow); border: 1px solid var(--ink); }
+
+body.coboot-skin .chat-head { min-height: 72px; padding: 13px 24px; background: #fff; border-bottom: 2px solid var(--ink); }
+body.coboot-skin .ch-avatar { background: var(--yellow); border-radius: 50%; }
+body.coboot-skin .chat-title { color: var(--ink); font-size: 18px; font-weight: 950; }
+body.coboot-skin .chat-sub { color: var(--ink-soft); font-weight: 700; }
+body.coboot-skin .chat-status.running { color: var(--violet-dark); font-weight: 900; }
+body.coboot-skin .chat-feed {
+  padding: 26px 34px 14px;
+  background-color: var(--milk);
+  background-image: radial-gradient(var(--grid-dot) 1.1px, transparent 1.1px);
+  background-size: 20px 20px;
+}
+body.coboot-skin .feed-empty { background: #fff; padding: 24px; border: 2px solid var(--ink); border-radius: 20px; box-shadow: var(--shadow); color: var(--ink); }
+body.coboot-skin .msg-avatar { border-radius: 50%; background: var(--cyan); }
+body.coboot-skin .msg-main { max-width: min(720px, 78%); }
+body.coboot-skin .msg-name { color: var(--ink); font-weight: 900; }
+body.coboot-skin .msg-handle,
+body.coboot-skin .msg-time { color: var(--ink-soft); }
+body.coboot-skin .bubble {
+  border: 2px solid var(--ink); border-radius: 5px 18px 18px 18px; background: #fff; color: var(--ink);
+  box-shadow: 4px 4px 0 var(--ink); padding: 12px 16px;
+}
+body.coboot-skin .msg.me .bubble,
+body.coboot-skin .msg.me .bubble strong,
+body.coboot-skin .msg.me .bubble a { background: var(--yellow); border-color: var(--ink); border-radius: 18px 5px 18px 18px; color: var(--ink); }
+body.coboot-skin .bubble .mention,
+body.coboot-skin .msg-handoff { background: var(--pink); color: var(--ink); border: 1px solid var(--ink); border-radius: 7px; font-weight: 900; }
+body.coboot-skin .sys-line span,
+body.coboot-skin .kb-ref,
+body.coboot-skin .reasoning summary { background: #fff; color: var(--ink); border: 1.5px solid var(--ink); border-radius: 999px; font-weight: 800; }
+body.coboot-skin .approval-bar,
+body.coboot-skin .approval-card { background: var(--yellow); border: 2px solid var(--ink); box-shadow: 4px 4px 0 var(--ink); }
+body.coboot-skin .ga-icon { background: var(--pink); color: var(--ink); border: 1.5px solid var(--ink); }
+body.coboot-skin .typing-strip { padding-inline: 34px; }
+body.coboot-skin .ts-chip { background: #fff; border: 1.5px solid var(--ink); color: var(--ink); box-shadow: 2px 2px 0 var(--ink); }
+body.coboot-skin .jump-latest { background: var(--yellow); color: var(--ink); border: 2px solid var(--ink); box-shadow: 3px 3px 0 var(--ink); }
+
+body.coboot-skin .composer { padding: 9px 26px 22px; background: var(--milk); }
+body.coboot-skin .composer-card { background: #fff; border: 2px solid var(--ink); border-radius: 20px; box-shadow: 5px 5px 0 var(--ink); }
+body.coboot-skin .composer-card:focus-within { border-color: var(--ink); background: var(--yellow); box-shadow: 7px 7px 0 var(--ink); }
+body.coboot-skin .composer-card textarea { color: var(--ink); }
+body.coboot-skin .composer-card textarea::placeholder { color: var(--ink-soft); }
+body.coboot-skin .kbd-hint { color: var(--ink-soft); font-weight: 800; }
+body.coboot-skin .kb-mount-btn:hover,
+body.coboot-skin .qm-chip:hover { background: var(--cyan); border-color: var(--ink); color: var(--ink); }
+body.coboot-skin .kb-mount-count { background: var(--violet); border: 1px solid var(--ink); color: #fff; }
+body.coboot-skin .send-btn { width: 40px; height: 40px; background: var(--violet); border: 2px solid var(--ink); color: #fff; box-shadow: 3px 3px 0 var(--ink); }
+body.coboot-skin .send-btn:hover:not(:disabled) { background: var(--pink); color: var(--ink); }
+
+/* Catalog, knowledge, friends: cards become Coboot station signs */
+body.coboot-skin .page-head { padding: 30px 34px 22px; background: var(--violet); border-bottom: 2px solid var(--ink); }
+body.coboot-skin .agent-heading h1 { color: #fff; font-size: clamp(28px, 3vw, 42px); line-height: 1; font-weight: 950; letter-spacing: -.05em; }
+body.coboot-skin .agent-heading h1::after { content: ""; display: block; width: 62px; height: 8px; margin-top: 10px; background: var(--yellow); border: 2px solid var(--ink); border-radius: 99px; transform: rotate(-2deg); }
+body.coboot-skin .agent-heading p { color: #fff; font-size: 14px; font-weight: 700; }
+body.coboot-skin .page-body { padding: 28px 34px 42px; background: var(--milk); background-image: radial-gradient(var(--grid-dot) 1.1px, transparent 1.1px); background-size: 20px 20px; }
+body.coboot-skin .primary-btn,
+body.coboot-skin .approve-btn { border: 2px solid var(--ink); background: var(--yellow); color: var(--ink); box-shadow: 4px 4px 0 var(--ink); }
+body.coboot-skin .primary-btn:hover,
+body.coboot-skin .approve-btn:hover { background: var(--pink); color: var(--ink); }
+body.coboot-skin .ghost-btn,
+body.coboot-skin .ac-edit,
+body.coboot-skin .chat-cta,
+body.coboot-skin .reject-btn { border: 2px solid var(--ink); background: #fff; color: var(--ink); box-shadow: 3px 3px 0 var(--ink); }
+body.coboot-skin .ghost-btn:hover,
+body.coboot-skin .ac-edit:hover,
+body.coboot-skin .chat-cta:hover { background: var(--cyan); color: var(--ink); border-color: var(--ink); }
+body.coboot-skin .card-grid { gap: 22px; }
+body.coboot-skin .a-card,
+body.coboot-skin .k-card,
+body.coboot-skin .friends-add-card,
+body.coboot-skin .friends-section {
+  background: #fff; border: 2px solid var(--ink); border-radius: 20px; box-shadow: 5px 5px 0 var(--ink);
+}
+body.coboot-skin .a-card { min-height: 210px; padding: 20px; }
+body.coboot-skin .a-card:hover,
+body.coboot-skin .k-card:hover,
+body.coboot-skin .k-card:focus-visible { transform: translate(-3px,-3px) rotate(-.35deg); border-color: var(--ink); box-shadow: 8px 8px 0 var(--ink); }
+body.coboot-skin .a-card:nth-child(3n+1) .ac-avatar,
+body.coboot-skin .k-card:nth-child(3n+1) .kc-icon { background: var(--yellow); }
+body.coboot-skin .a-card:nth-child(3n+2) .ac-avatar,
+body.coboot-skin .k-card:nth-child(3n+2) .kc-icon { background: var(--pink); }
+body.coboot-skin .a-card:nth-child(3n) .ac-avatar,
+body.coboot-skin .k-card:nth-child(3n) .kc-icon { background: var(--cyan); }
+body.coboot-skin .ac-name-text,
+body.coboot-skin .kc-name,
+body.coboot-skin .friends-add-title,
+body.coboot-skin .friends-section-title { color: var(--ink); font-weight: 950; }
+body.coboot-skin .ac-desc,
+body.coboot-skin .kc-desc,
+body.coboot-skin .kc-meta { color: var(--ink-soft); }
+body.coboot-skin .chip { background: var(--lavender); }
+body.coboot-skin .chip.kb-chip,
+body.coboot-skin .kc-index-state.ready { background: var(--cyan); color: var(--ink); }
+body.coboot-skin .ac-actions { border-color: var(--ink); }
+body.coboot-skin .k-card { padding: 19px; }
+body.coboot-skin .kc-index-state { border: 1.5px solid var(--ink); background: var(--lavender); color: var(--ink); font-weight: 900; }
+body.coboot-skin .kc-del { border: 1.5px solid var(--ink); background: #fff; color: var(--ink); }
+body.coboot-skin .kc-del:hover { background: var(--pink); color: var(--ink); }
+body.coboot-skin .friends-page { max-width: none; }
+body.coboot-skin .friend-add-row input,
+body.coboot-skin .friend-item,
+body.coboot-skin .user-id-card { border: 2px solid var(--ink); background: var(--milk); border-radius: 12px; color: var(--ink); }
+body.coboot-skin .friend-item { background: #fff; box-shadow: 2px 2px 0 var(--ink); }
+body.coboot-skin .friend-avatar { border: 2px solid var(--ink); background: var(--cyan); }
+
+/* Drawers, forms and all modal surfaces */
+body.coboot-skin .drawer-mask,
+body.coboot-skin .modal { background: rgba(23,18,31,.52); backdrop-filter: blur(4px); }
+body.coboot-skin .drawer { background: var(--milk); border-left: 3px solid var(--ink); box-shadow: -7px 0 0 var(--ink); }
+body.coboot-skin .dw-head { background: var(--violet); border-bottom: 2px solid var(--ink); color: #fff; }
+body.coboot-skin .dw-title { color: #fff; font-weight: 950; }
+body.coboot-skin .dw-sub { color: var(--yellow); }
+body.coboot-skin .icon-btn,
+body.coboot-skin .modal-close,
+body.coboot-skin .agent-back { border: 2px solid var(--ink); background: #fff; color: var(--ink); box-shadow: 2px 2px 0 var(--ink); }
+body.coboot-skin .modal-card {
+  background: var(--milk); border: 3px solid var(--ink); border-radius: 26px; box-shadow: 12px 13px 0 var(--ink);
+}
+body.coboot-skin .modal-title,
+body.coboot-skin .settings-card h2 { color: var(--ink); font-weight: 950; }
+body.coboot-skin .modal-title::before,
+body.coboot-skin .settings-kicker { display: inline-block; padding: 5px 10px; background: var(--violet); color: #fff; border: 1.5px solid var(--ink); border-radius: 999px; font-size: 10px; font-weight: 900; letter-spacing: .05em; }
+body.coboot-skin .modal-title::before { content: "UNISCI AI"; margin-right: 9px; vertical-align: 2px; }
+body.coboot-skin .modal-sub,
+body.coboot-skin .field-label { color: var(--ink-soft); font-weight: 700; }
+body.coboot-skin .modal-card input[type=text],
+body.coboot-skin .modal-card textarea,
+body.coboot-skin .modal-card input[type=password],
+body.coboot-skin .config-field input[type=text],
+body.coboot-skin .config-field textarea,
+body.coboot-skin .config-field select,
+body.coboot-skin .kb-paste-area textarea,
+body.coboot-skin .kb-search-row input,
+body.coboot-skin .ga-note {
+  border: 2px solid var(--ink); background: #fff; border-radius: 11px; color: var(--ink); box-shadow: 2px 2px 0 var(--ink);
+}
+body.coboot-skin .modal-card input:focus,
+body.coboot-skin .modal-card textarea:focus,
+body.coboot-skin .config-field input:focus,
+body.coboot-skin .config-field textarea:focus,
+body.coboot-skin .kb-paste-area textarea:focus,
+body.coboot-skin .kb-search-row input:focus { background: var(--yellow); border-color: var(--ink); box-shadow: 4px 4px 0 var(--ink); }
+body.coboot-skin .agent-option-card,
+body.coboot-skin .kb-pop-option,
+body.coboot-skin .agent-kb-option,
+body.coboot-skin .kb-doc-item,
+body.coboot-skin .kb-hit { border: 2px solid var(--ink); background: #fff; border-radius: 12px; }
+body.coboot-skin .agent-option-card:hover,
+body.coboot-skin .agent-option-card:focus-visible,
+body.coboot-skin .agent-kb-option:has(input:checked),
+body.coboot-skin .kb-pop-option:has(input:checked) { background: var(--pink); border-color: var(--ink); }
+body.coboot-skin .kb-upload-zone { border: 2px dashed var(--ink); border-radius: 16px; background: var(--cyan); color: var(--ink); }
+body.coboot-skin .kb-upload-zone:hover,
+body.coboot-skin .kb-upload-zone.drag { border-color: var(--ink); background: var(--yellow); color: var(--ink); }
+
+body.coboot-skin .agent-config { background: var(--milk); }
+body.coboot-skin .agent-config-bar { background: var(--violet); border-bottom: 2px solid var(--ink); box-shadow: none; }
+body.coboot-skin .agent-config-kicker,
+body.coboot-skin .agent-config-nav h1,
+body.coboot-skin .agent-config-state { color: #fff; }
+body.coboot-skin .agent-config-main { background: #fff; border: 2px solid var(--ink); border-radius: 20px; box-shadow: 6px 6px 0 var(--ink); }
+body.coboot-skin .config-section + .config-section { border-top: 2px solid var(--ink); }
+body.coboot-skin .config-section-head h2,
+body.coboot-skin .agent-kb-head h2 { font-weight: 950; }
+body.coboot-skin .avatar-option { border: 2px solid var(--ink); background: #fff; border-radius: 12px; box-shadow: 2px 2px 0 var(--ink); }
+body.coboot-skin .avatar-option.selected { border-color: var(--ink); background: var(--yellow); box-shadow: 3px 3px 0 var(--ink); }
+body.coboot-skin .avatar-upload-btn { border: 2px solid var(--ink); background: var(--cyan); color: var(--ink); box-shadow: 2px 2px 0 var(--ink); }
+
+body.coboot-skin .settings-card { border: 3px solid var(--ink); box-shadow: 12px 13px 0 var(--ink); }
+body.coboot-skin .settings-profile,
+body.coboot-skin .settings-list li,
+body.coboot-skin .profile-avatar-row { border-color: var(--ink); }
+body.coboot-skin .row-btn { border: 2px solid var(--ink); background: #fff; color: var(--ink); box-shadow: 2px 2px 0 var(--ink); }
+body.coboot-skin .row-btn:hover { background: var(--yellow); }
+body.coboot-skin .settings-avatar,
+body.coboot-skin .profile-avatar-preview { border: 2px solid var(--ink); background: var(--pink); color: var(--ink); }
+body.coboot-skin .toast,
+body.coboot-skin .reconnect-toast { border: 2px solid var(--ink); background: var(--yellow); color: var(--ink); box-shadow: var(--shadow); font-weight: 900; }
+body.coboot-skin .toast.ok { background: var(--cyan); }
+body.coboot-skin .toast.err { background: var(--pink); }
+
+@media (max-width: 760px) {
+  body.coboot-skin .rail { width: 72px; padding-inline: 7px; }
+  body.coboot-skin .rail-item span { font-size: 9px; }
+  body.coboot-skin .sidebar { width: 260px; }
+  body.coboot-skin .page-head { padding: 22px 18px 18px; }
+  body.coboot-skin .page-body { padding: 18px; }
+  body.coboot-skin .chat-feed { padding: 18px 14px 10px; }
+  body.coboot-skin .composer { padding: 8px 14px 16px; }
+  body.coboot-skin .msg-main { max-width: 85%; }
+  body.coboot-skin .agent-heading h1 { font-size: 31px; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  body.coboot-skin *, body.coboot-skin *::before, body.coboot-skin *::after { animation-duration: .01ms !important; transition-duration: .01ms !important; }
+}
+
+/* ========================================================================== */
+/* Coboot reference-theme engine — every option owns the entire workspace.   */
+/* ========================================================================== */
+body.coboot-skin[data-theme] {
+  --rail-bg: var(--violet);
+  --rail-fg: #fff;
+  --paper-surface: #fff;
+  --page-ground: var(--milk);
+  --card-shadow: 5px 5px 0 var(--ink);
+  --control-radius: 999px;
+  --panel-radius: 20px;
+  --rule: 2px solid var(--ink);
+  background: var(--page-ground);
+}
+body.coboot-skin[data-theme] #app { background: var(--page-ground); }
+body.coboot-skin[data-theme] .rail { background: var(--rail-bg); }
+body.coboot-skin[data-theme] .rail-item { color: var(--rail-fg); }
+body.coboot-skin[data-theme] .page-head,
+body.coboot-skin[data-theme] .agent-config-bar,
+body.coboot-skin[data-theme] .dw-head { background: var(--rail-bg); }
+body.coboot-skin[data-theme] .page-body,
+body.coboot-skin[data-theme] .chat-feed { background-color: var(--page-ground); }
+body.coboot-skin[data-theme] .sidebar,
+body.coboot-skin[data-theme] .view-page,
+body.coboot-skin[data-theme] .center-panel,
+body.coboot-skin[data-theme] .composer,
+body.coboot-skin[data-theme] .agent-config,
+body.coboot-skin[data-theme] .drawer { background: var(--page-ground); }
+body.coboot-skin[data-theme] .chat-head,
+body.coboot-skin[data-theme] .composer-card,
+body.coboot-skin[data-theme] .a-card,
+body.coboot-skin[data-theme] .k-card,
+body.coboot-skin[data-theme] .friends-add-card,
+body.coboot-skin[data-theme] .friends-section,
+body.coboot-skin[data-theme] .modal-card,
+body.coboot-skin[data-theme] .agent-config-main { background: var(--paper-surface); }
+body.coboot-skin[data-theme] .msg.me .bubble,
+body.coboot-skin[data-theme] .msg.me .bubble strong,
+body.coboot-skin[data-theme] .msg.me .bubble a { color: var(--ink) !important; }
+body.coboot-skin[data-theme] .msg.me .msg-name,
+body.coboot-skin[data-theme] .msg.me .msg-time { color: var(--ink); }
+body.coboot-skin[data-theme] .theme-current { color: var(--ink-soft); }
+
+/* Theme picker */
+body.coboot-skin .settings-card[data-view="appearance"] { width: min(900px, calc(100vw - 40px)); }
+body.coboot-skin .appearance-lead { max-width: 62ch; margin: 8px 0 0; color: var(--ink-soft); line-height: 1.65; }
+body.coboot-skin .theme-current { display: inline-flex; margin: 16px 0 14px; padding: 6px 10px; border: 1.5px solid var(--ink); border-radius: 999px; background: var(--yellow); color: var(--ink); font-size: 12px; font-weight: 900; }
+body.coboot-skin .theme-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; }
+body.coboot-skin .theme-choice {
+  position: relative; min-height: 136px; display: grid; grid-template-columns: 48px 1fr; grid-template-rows: auto 1fr; gap: 5px 11px;
+  padding: 13px; text-align: left; border: 2px solid var(--ink); border-radius: 15px; background: #fff; color: var(--ink); box-shadow: 3px 3px 0 var(--ink);
+}
+body.coboot-skin .theme-choice:hover { transform: translate(-2px, -2px); box-shadow: 6px 6px 0 var(--ink); }
+body.coboot-skin .theme-choice.active { background: var(--yellow); box-shadow: 5px 5px 0 var(--ink); }
+body.coboot-skin .theme-choice.active::after { content: "当前"; position: absolute; top: 8px; right: 9px; padding: 2px 6px; border: 1px solid var(--ink); border-radius: 999px; background: var(--ink); color: #fff; font-size: 9px; line-height: 1.2; }
+body.coboot-skin .theme-choice strong { align-self: end; font-size: 14px; line-height: 1.05; }
+body.coboot-skin .theme-choice small { grid-column: 2; align-self: start; color: var(--ink-soft); font-size: 11px; line-height: 1.35; font-weight: 750; }
+body.coboot-skin .theme-swatch { grid-row: 1 / span 2; width: 48px; height: 76px; display: grid; grid-template-rows: 1.2fr .7fr .45fr; overflow: hidden; border: 2px solid var(--ink); border-radius: 9px; }
+body.coboot-skin .theme-swatch i { display: block; }
+.theme-choice.station .theme-swatch i:nth-child(1) { background: #7c5cff; }.theme-choice.station .theme-swatch i:nth-child(2) { background: #f4ff72; }.theme-choice.station .theme-swatch i:nth-child(3) { background: #ff9dcf; }
+.theme-choice.authority .theme-swatch i:nth-child(1) { background: #f2ead8; }.theme-choice.authority .theme-swatch i:nth-child(2) { background: #8c2538; }.theme-choice.authority .theme-swatch i:nth-child(3) { background: #8da58e; }
+.theme-choice.editorial .theme-swatch i:nth-child(1) { background: #ff3e2e; }.theme-choice.editorial .theme-swatch i:nth-child(2) { background: #ffe548; }.theme-choice.editorial .theme-swatch i:nth-child(3) { background: #275cf6; }
+.theme-choice.archive .theme-swatch i:nth-child(1) { background: #1c4f72; }.theme-choice.archive .theme-swatch i:nth-child(2) { background: #f4edda; }.theme-choice.archive .theme-swatch i:nth-child(3) { background: #9a6542; }
+.theme-choice.lab .theme-swatch i:nth-child(1) { background: #1557e8; }.theme-choice.lab .theme-swatch i:nth-child(2) { background: #f3f3ef; }.theme-choice.lab .theme-swatch i:nth-child(3) { background: #f23b2d; }
+.theme-choice.subagents .theme-swatch i:nth-child(1) { background: #ffd42a; }.theme-choice.subagents .theme-swatch i:nth-child(2) { background: #2854d8; }.theme-choice.subagents .theme-swatch i:nth-child(3) { background: #f04435; }
+.theme-choice.ledger .theme-swatch i:nth-child(1) { background: #e5f0dd; }.theme-choice.ledger .theme-swatch i:nth-child(2) { background: #205f45; }.theme-choice.ledger .theme-swatch i:nth-child(3) { background: #e9ff57; }
+.theme-choice.theatre .theme-swatch i:nth-child(1) { background: #f8c9b8; }.theme-choice.theatre .theme-swatch i:nth-child(2) { background: #164c3a; }.theme-choice.theatre .theme-swatch i:nth-child(3) { background: #ffd85a; }
+.theme-choice.tactics .theme-swatch i:nth-child(1) { background: #0c694c; }.theme-choice.tactics .theme-swatch i:nth-child(2) { background: #f6f2de; }.theme-choice.tactics .theme-swatch i:nth-child(3) { background: #ffd94d; }
+
+/* 02 — 换乘站 / message transit network */
+body.coboot-skin[data-theme="station"] {
+  --violet: #7c5cff; --violet-dark: #6241ec; --yellow: #f4ff72; --ink: #17121f; --ink-soft: #51495c;
+  --milk: #fffdf5; --pink: #ff9dcf; --cyan: #74e8e2; --lavender: #e3d9ff; --grid-dot: #d5cced;
+  --page-ground: #fffdf5; --rail-bg: #7c5cff; --rail-fg: #fff; --paper-surface: #fff; --sans: "Trebuchet MS", "Microsoft YaHei", "PingFang SC", sans-serif;
+}
+
+/* 03 — 权限管理 / signed collaboration dossier */
+body.coboot-skin[data-theme="authority"] {
+  --violet: #8c2538; --violet-dark: #6d182a; --yellow: #e7d5a4; --ink: #24211e; --ink-soft: #655f56;
+  --milk: #f2ead8; --pink: #8da58e; --cyan: #e1d7bd; --lavender: #ebe1cd; --grid-dot: #d3c6ae;
+  --page-ground: #f2ead8; --rail-bg: #8c2538; --rail-fg: #fffaf0; --paper-surface: #fffaf0; --sans: Georgia, "Noto Serif SC", SimSun, serif;
+  --card-shadow: 8px 10px 0 rgba(36,33,30,.14); --panel-radius: 0px; --control-radius: 0px;
+}
+body.coboot-skin[data-theme="authority"] .rail { width: 104px; padding-inline: 11px; }
+body.coboot-skin[data-theme="authority"] .rail-item { border-radius: 0; font-family: "Segoe UI", "Microsoft YaHei", sans-serif; }
+body.coboot-skin[data-theme="authority"] .rail-item.active { background: #fffaf0; color: #8c2538; box-shadow: none; }
+body.coboot-skin[data-theme="authority"] .page-head { background: #f2ead8; border-bottom: 1px solid var(--ink); }
+body.coboot-skin[data-theme="authority"] .agent-heading h1,
+body.coboot-skin[data-theme="authority"] .agent-heading p { color: var(--ink); }
+body.coboot-skin[data-theme="authority"] .agent-heading h1::after { background: var(--violet); border-width: 1px; border-radius: 0; transform: none; }
+body.coboot-skin[data-theme="authority"] .page-body,
+body.coboot-skin[data-theme="authority"] .chat-feed { background-image: repeating-linear-gradient(0deg, transparent 0 27px, rgba(36,33,30,.07) 28px); }
+body.coboot-skin[data-theme="authority"] .a-card,
+body.coboot-skin[data-theme="authority"] .k-card,
+body.coboot-skin[data-theme="authority"] .modal-card,
+body.coboot-skin[data-theme="authority"] .composer-card { border-width: 1px; border-radius: 0; box-shadow: var(--card-shadow); }
+body.coboot-skin[data-theme="authority"] .bubble { border-width: 1px; border-radius: 0 12px 12px 12px; box-shadow: 4px 5px 0 rgba(36,33,30,.14); }
+body.coboot-skin[data-theme="authority"] .msg.me .bubble { background: #e7d5a4; border-radius: 12px 0 12px 12px; }
+body.coboot-skin[data-theme="authority"] .primary-btn,
+body.coboot-skin[data-theme="authority"] .auth-submit { background: var(--violet); color: #fff; box-shadow: 3px 3px 0 rgba(36,33,30,.35); }
+body.coboot-skin[data-theme="authority"] .settings-kicker,
+body.coboot-skin[data-theme="authority"] .modal-title::before { background: var(--violet); border-radius: 0; }
+
+/* 06 — Agent 发帖子 / street editorial press */
+body.coboot-skin[data-theme="editorial"] {
+  --violet: #ff3e2e; --violet-dark: #da271d; --yellow: #ffe548; --ink: #111; --ink-soft: #443d36;
+  --milk: #fff8df; --pink: #ff846d; --cyan: #275cf6; --lavender: #f9d3b7; --grid-dot: #f0a899;
+  --page-ground: #fff8df; --rail-bg: #ff3e2e; --rail-fg: #111; --paper-surface: #fff8df; --sans: "Franklin Gothic Medium", "Microsoft YaHei", sans-serif;
+  --panel-radius: 0px; --control-radius: 0px; --card-shadow: 7px 7px 0 #111;
+}
+body.coboot-skin[data-theme="editorial"] #app { background: #ff3e2e; }
+body.coboot-skin[data-theme="editorial"] .rail { background: #ffe548; width: 96px; }
+body.coboot-skin[data-theme="editorial"] .rail-item { color: #111; border-radius: 0; }
+body.coboot-skin[data-theme="editorial"] .rail-item.active { background: #275cf6; color: #fff; border-color: #111; box-shadow: 4px 4px 0 #111; }
+body.coboot-skin[data-theme="editorial"] .page-head { background: #ff3e2e; }
+body.coboot-skin[data-theme="editorial"] .agent-heading h1 { font-family: Impact, "Arial Black", "Microsoft YaHei", sans-serif; text-transform: uppercase; color: #111; letter-spacing: -.025em; }
+body.coboot-skin[data-theme="editorial"] .agent-heading p { color: #111; font-weight: 900; }
+body.coboot-skin[data-theme="editorial"] .page-body,
+body.coboot-skin[data-theme="editorial"] .chat-feed { background-color: #fff8df; background-image: radial-gradient(rgba(17,17,17,.18) 1px, transparent 1px); background-size: 9px 9px; }
+body.coboot-skin[data-theme="editorial"] .a-card,
+body.coboot-skin[data-theme="editorial"] .k-card,
+body.coboot-skin[data-theme="editorial"] .modal-card,
+body.coboot-skin[data-theme="editorial"] .composer-card,
+body.coboot-skin[data-theme="editorial"] .bubble { border-width: 3px; border-radius: 0; box-shadow: var(--card-shadow); }
+body.coboot-skin[data-theme="editorial"] .a-card:nth-child(3n+1),
+body.coboot-skin[data-theme="editorial"] .k-card:nth-child(3n+1) { background: #ffe548; }
+body.coboot-skin[data-theme="editorial"] .a-card:nth-child(3n+2),
+body.coboot-skin[data-theme="editorial"] .k-card:nth-child(3n+2) { background: #ffded2; }
+body.coboot-skin[data-theme="editorial"] .msg.me .bubble { background: #ffe548; }
+body.coboot-skin[data-theme="editorial"] .primary-btn,
+body.coboot-skin[data-theme="editorial"] .send-btn { background: #275cf6; color: #fff; }
+body.coboot-skin[data-theme="editorial"] .primary-btn:hover,
+body.coboot-skin[data-theme="editorial"] .send-btn:hover { background: #111; color: #ffe548; }
+
+/* 07 — 专业知识库 / physical archive cabinet */
+body.coboot-skin[data-theme="archive"] {
+  --violet: #1c4f72; --violet-dark: #12364e; --yellow: #d6ad55; --ink: #25241f; --ink-soft: #514d43;
+  --milk: #f4edda; --pink: #9a6542; --cyan: #d9e7e6; --lavender: #e1d6bc; --grid-dot: #d0c2a8;
+  --page-ground: #f4edda; --rail-bg: #1c4f72; --rail-fg: #fffaf0; --paper-surface: #fffaf0; --sans: "Segoe UI", "Microsoft YaHei", sans-serif;
+  --panel-radius: 2px; --card-shadow: 7px 8px 0 rgba(37,36,31,.16);
+}
+body.coboot-skin[data-theme="archive"] .rail { border-right-color: #d6ad55; }
+body.coboot-skin[data-theme="archive"] .rail-item { border-radius: 3px; }
+body.coboot-skin[data-theme="archive"] .rail-item.active { background: #d6ad55; color: #25241f; box-shadow: 3px 3px 0 #25241f; }
+body.coboot-skin[data-theme="archive"] .page-head { border-bottom: 6px solid #d6ad55; }
+body.coboot-skin[data-theme="archive"] .agent-heading h1,
+body.coboot-skin[data-theme="archive"] .settings-card h2 { font-family: Georgia, SimSun, serif; }
+body.coboot-skin[data-theme="archive"] .page-body,
+body.coboot-skin[data-theme="archive"] .chat-feed { background-image: repeating-linear-gradient(90deg, transparent 0 31px, rgba(37,36,31,.045) 32px); }
+body.coboot-skin[data-theme="archive"] .a-card,
+body.coboot-skin[data-theme="archive"] .k-card { border-radius: 1px; box-shadow: 8px 9px 0 rgba(37,36,31,.17); }
+body.coboot-skin[data-theme="archive"] .k-card { border-top: 12px solid #9a6542; }
+body.coboot-skin[data-theme="archive"] .bubble { border-radius: 2px 13px 13px 13px; box-shadow: 3px 4px 0 rgba(37,36,31,.16); }
+body.coboot-skin[data-theme="archive"] .msg.me .bubble { background: #d6ad55; border-radius: 13px 2px 13px 13px; }
+body.coboot-skin[data-theme="archive"] .composer-card,
+body.coboot-skin[data-theme="archive"] .modal-card { border-radius: 2px; box-shadow: var(--card-shadow); }
+
+/* 09 — 外部 Agent / engineering patch bay */
+body.coboot-skin[data-theme="lab"] {
+  --violet: #1557e8; --violet-dark: #0d42bb; --yellow: #d9dde0; --ink: #121722; --ink-soft: #515966;
+  --milk: #f3f3ef; --pink: #f23b2d; --cyan: #2bc27a; --lavender: #e7efff; --grid-dot: #c5cad0;
+  --page-ground: #f3f3ef; --rail-bg: #1557e8; --rail-fg: #fff; --paper-surface: #fff; --sans: "Segoe UI", "Microsoft YaHei", sans-serif;
+  --panel-radius: 0px; --control-radius: 2px; --card-shadow: 4px 4px 0 #121722;
+}
+body.coboot-skin[data-theme="lab"] #app { background: #f3f3ef; }
+body.coboot-skin[data-theme="lab"] .rail { width: 96px; }
+body.coboot-skin[data-theme="lab"] .rail-item { border-radius: 2px; }
+body.coboot-skin[data-theme="lab"] .rail-item.active { background: #f3f3ef; color: #1557e8; border-color: #121722; box-shadow: 3px 3px 0 #121722; }
+body.coboot-skin[data-theme="lab"] .page-head { background: #d9dde0; }
+body.coboot-skin[data-theme="lab"] .agent-heading h1,
+body.coboot-skin[data-theme="lab"] .agent-heading p { color: #121722; font-family: Consolas, "Microsoft YaHei", monospace; }
+body.coboot-skin[data-theme="lab"] .agent-heading h1::after { background: #f23b2d; border-radius: 0; transform: none; }
+body.coboot-skin[data-theme="lab"] .page-body,
+body.coboot-skin[data-theme="lab"] .chat-feed { background-image: linear-gradient(rgba(18,23,34,.055) 1px, transparent 1px), linear-gradient(90deg, rgba(18,23,34,.055) 1px, transparent 1px); background-size: 22px 22px; }
+body.coboot-skin[data-theme="lab"] .a-card,
+body.coboot-skin[data-theme="lab"] .k-card,
+body.coboot-skin[data-theme="lab"] .modal-card,
+body.coboot-skin[data-theme="lab"] .composer-card,
+body.coboot-skin[data-theme="lab"] .bubble { border-radius: 0; box-shadow: var(--card-shadow); }
+body.coboot-skin[data-theme="lab"] .a-card::before,
+body.coboot-skin[data-theme="lab"] .k-card::before { content: "PORT / READY"; display: block; margin: -8px 0 10px; color: #1557e8; font-family: Consolas, monospace; font-size: 10px; font-weight: 900; }
+body.coboot-skin[data-theme="lab"] .msg.me .bubble { background: #e7efff; }
+body.coboot-skin[data-theme="lab"] .send-btn { background: #f23b2d; }
+body.coboot-skin[data-theme="lab"] code,
+body.coboot-skin[data-theme="lab"] .chat-status,
+body.coboot-skin[data-theme="lab"] .msg-time { font-family: Consolas, "Microsoft YaHei", monospace; }
+
+/* 10 — Subagents / kinetic comic issue */
+body.coboot-skin[data-theme="subagents"] {
+  --violet: #2854d8; --violet-dark: #183ca6; --yellow: #ffd42a; --ink: #101010; --ink-soft: #353535;
+  --milk: #fffbe9; --pink: #f04435; --cyan: #70e0b1; --lavender: #dbe2ff; --grid-dot: #c7ad28;
+  --page-ground: #ffd42a; --rail-bg: #2854d8; --rail-fg: #fff; --paper-surface: #fffbe9; --sans: Impact, Haettenschweiler, "Microsoft YaHei", sans-serif;
+  --panel-radius: 0px; --control-radius: 0px; --card-shadow: 6px 6px 0 #101010;
+}
+body.coboot-skin[data-theme="subagents"] #app { background: #ffd42a; }
+body.coboot-skin[data-theme="subagents"] .rail { width: 96px; }
+body.coboot-skin[data-theme="subagents"] .rail-item { border-radius: 0; }
+body.coboot-skin[data-theme="subagents"] .rail-item.active { background: #ffd42a; color: #101010; box-shadow: 4px 4px 0 #101010; }
+body.coboot-skin[data-theme="subagents"] .page-head { background: #fffbe9; }
+body.coboot-skin[data-theme="subagents"] .agent-heading h1,
+body.coboot-skin[data-theme="subagents"] .agent-heading p { color: #101010; }
+body.coboot-skin[data-theme="subagents"] .agent-heading h1 { text-transform: uppercase; text-shadow: 3px 3px 0 #fffbe9; }
+body.coboot-skin[data-theme="subagents"] .agent-heading h1::after { background: #f04435; border-width: 3px; border-radius: 0; transform: rotate(-2deg); }
+body.coboot-skin[data-theme="subagents"] .page-body,
+body.coboot-skin[data-theme="subagents"] .chat-feed { background-color: #ffd42a; background-image: radial-gradient(#101010 1px, transparent 1px); background-size: 14px 14px; }
+body.coboot-skin[data-theme="subagents"] .a-card,
+body.coboot-skin[data-theme="subagents"] .k-card,
+body.coboot-skin[data-theme="subagents"] .modal-card,
+body.coboot-skin[data-theme="subagents"] .composer-card,
+body.coboot-skin[data-theme="subagents"] .bubble { border-width: 3px; border-radius: 0; box-shadow: var(--card-shadow); }
+body.coboot-skin[data-theme="subagents"] .a-card:nth-child(3n+1) { background: #fffbe9; }
+body.coboot-skin[data-theme="subagents"] .a-card:nth-child(3n+2) { background: #70e0b1; }
+body.coboot-skin[data-theme="subagents"] .a-card:nth-child(3n) { background: #f04435; color: #fff; }
+body.coboot-skin[data-theme="subagents"] .msg.me .bubble { background: #70e0b1; }
+body.coboot-skin[data-theme="subagents"] .primary-btn,
+body.coboot-skin[data-theme="subagents"] .send-btn { background: #f04435; color: #fff; }
+
+/* 11 — 财务花费 / mint ledger */
+body.coboot-skin[data-theme="ledger"] {
+  --violet: #205f45; --violet-dark: #154532; --yellow: #e9ff57; --ink: #182018; --ink-soft: #465646;
+  --milk: #e5f0dd; --pink: #c73f32; --cyan: #c7e2d1; --lavender: #edf5e8; --grid-dot: #9eb29f;
+  --page-ground: #e5f0dd; --rail-bg: #205f45; --rail-fg: #fffff8; --paper-surface: #fffff8; --sans: "Segoe UI", "Microsoft YaHei", sans-serif;
+  --panel-radius: 1px; --control-radius: 1px; --card-shadow: 5px 6px 0 rgba(24,32,24,.16);
+}
+body.coboot-skin[data-theme="ledger"] #app { background: #e5f0dd; }
+body.coboot-skin[data-theme="ledger"] .rail { width: 100px; }
+body.coboot-skin[data-theme="ledger"] .rail-item { border-radius: 2px; }
+body.coboot-skin[data-theme="ledger"] .rail-item.active { background: #e9ff57; color: #182018; box-shadow: none; }
+body.coboot-skin[data-theme="ledger"] .page-head { background: #e5f0dd; }
+body.coboot-skin[data-theme="ledger"] .agent-heading h1,
+body.coboot-skin[data-theme="ledger"] .agent-heading p { color: #182018; }
+body.coboot-skin[data-theme="ledger"] .agent-heading h1::after { background: #205f45; border-width: 1px; border-radius: 0; transform: none; }
+body.coboot-skin[data-theme="ledger"] .page-body,
+body.coboot-skin[data-theme="ledger"] .chat-feed { background-image: repeating-linear-gradient(0deg, transparent 0 27px, rgba(24,32,24,.08) 28px); }
+body.coboot-skin[data-theme="ledger"] .a-card,
+body.coboot-skin[data-theme="ledger"] .k-card,
+body.coboot-skin[data-theme="ledger"] .modal-card,
+body.coboot-skin[data-theme="ledger"] .composer-card,
+body.coboot-skin[data-theme="ledger"] .bubble { border-width: 1px; border-radius: 0; box-shadow: var(--card-shadow); }
+body.coboot-skin[data-theme="ledger"] .a-card::after,
+body.coboot-skin[data-theme="ledger"] .k-card::after { content: "已登记"; display: block; margin-top: 12px; padding-top: 8px; border-top: 1px dashed #8fa08e; color: #205f45; font-size: 11px; font-weight: 900; }
+body.coboot-skin[data-theme="ledger"] .msg.me .bubble { background: #e9ff57; }
+body.coboot-skin[data-theme="ledger"] .primary-btn,
+body.coboot-skin[data-theme="ledger"] .send-btn { background: #205f45; color: #fff; }
+
+/* 12 — 主动群聊 / peach conversation theatre */
+body.coboot-skin[data-theme="theatre"] {
+  --violet: #164c3a; --violet-dark: #0d382a; --yellow: #ffd85a; --ink: #1c2823; --ink-soft: #4d463f;
+  --milk: #fff9ef; --pink: #f8c9b8; --cyan: #dff1e6; --lavender: #f9ddd1; --grid-dot: #e7b7a7;
+  --page-ground: #f8c9b8; --rail-bg: #164c3a; --rail-fg: #fff9ef; --paper-surface: #fff9ef; --sans: "Segoe UI", "Microsoft YaHei", sans-serif;
+  --panel-radius: 28px; --control-radius: 999px; --card-shadow: 10px 12px 0 rgba(22,76,58,.19);
+}
+body.coboot-skin[data-theme="theatre"] #app { background: #f8c9b8; }
+body.coboot-skin[data-theme="theatre"] .rail { width: 100px; }
+body.coboot-skin[data-theme="theatre"] .rail-item { border-radius: 16px; }
+body.coboot-skin[data-theme="theatre"] .rail-item.active { background: #ffd85a; color: #1c2823; box-shadow: 4px 4px 0 #1c2823; }
+body.coboot-skin[data-theme="theatre"] .page-head { background: #164c3a; }
+body.coboot-skin[data-theme="theatre"] .agent-heading h1 { font-family: Georgia, SimSun, serif; font-style: italic; }
+body.coboot-skin[data-theme="theatre"] .page-body,
+body.coboot-skin[data-theme="theatre"] .chat-feed { background-color: #fff9ef; background-image: linear-gradient(to bottom, #fffaf2, #fff3e7); }
+body.coboot-skin[data-theme="theatre"] .a-card,
+body.coboot-skin[data-theme="theatre"] .k-card,
+body.coboot-skin[data-theme="theatre"] .modal-card,
+body.coboot-skin[data-theme="theatre"] .composer-card { border-width: 1px; border-radius: 25px 25px 10px 10px; box-shadow: var(--card-shadow); }
+body.coboot-skin[data-theme="theatre"] .bubble { border-width: 1px; border-radius: 4px 18px 18px 18px; box-shadow: none; }
+body.coboot-skin[data-theme="theatre"] .msg.me .bubble { background: #f8c9b8; border-radius: 18px 4px 18px 18px; }
+body.coboot-skin[data-theme="theatre"] .msg:not(.me) .bubble { background: #fff; }
+body.coboot-skin[data-theme="theatre"] .msg-handoff { background: #dff1e6; color: #164c3a; border-color: #164c3a; }
+body.coboot-skin[data-theme="theatre"] .primary-btn,
+body.coboot-skin[data-theme="theatre"] .send-btn { background: #164c3a; color: #fff; }
+
+/* 14 — AI 员工协作 / green tactics board */
+body.coboot-skin[data-theme="tactics"] {
+  --violet: #0c694c; --violet-dark: #074532; --yellow: #ffd94d; --ink: #10271f; --ink-soft: #426d5c;
+  --milk: #f6f2de; --pink: #f27642; --cyan: #78d4e6; --lavender: #e7a6d1; --grid-dot: #88a998;
+  --page-ground: #0c694c; --rail-bg: #074532; --rail-fg: #f6f2de; --paper-surface: #f6f2de; --sans: "Segoe UI", "Microsoft YaHei", sans-serif;
+  --panel-radius: 4px; --control-radius: 2px; --card-shadow: 8px 9px 0 rgba(4,35,25,.38);
+}
+body.coboot-skin[data-theme="tactics"] #app { background: #0c694c; }
+body.coboot-skin[data-theme="tactics"] .rail { width: 100px; border-right-color: #f6f2de; }
+body.coboot-skin[data-theme="tactics"] .rail-item { border-radius: 3px; }
+body.coboot-skin[data-theme="tactics"] .rail-item.active { background: #ffd94d; color: #10271f; box-shadow: 4px 4px 0 #10271f; }
+body.coboot-skin[data-theme="tactics"] .page-head { background: #0c694c; border-bottom-color: #f6f2de; }
+body.coboot-skin[data-theme="tactics"] .page-body,
+body.coboot-skin[data-theme="tactics"] .chat-feed { background-color: #0c694c; background-image: linear-gradient(rgba(246,242,222,.14) 1px, transparent 1px), linear-gradient(90deg, rgba(246,242,222,.14) 1px, transparent 1px); background-size: 28px 28px; }
+body.coboot-skin[data-theme="tactics"] .a-card,
+body.coboot-skin[data-theme="tactics"] .k-card,
+body.coboot-skin[data-theme="tactics"] .modal-card,
+body.coboot-skin[data-theme="tactics"] .composer-card { border-width: 2px; border-radius: 4px; box-shadow: var(--card-shadow); }
+body.coboot-skin[data-theme="tactics"] .a-card:nth-child(3n+1) { background: #ffd94d; }
+body.coboot-skin[data-theme="tactics"] .a-card:nth-child(3n+2) { background: #78d4e6; }
+body.coboot-skin[data-theme="tactics"] .a-card:nth-child(3n) { background: #e7a6d1; }
+body.coboot-skin[data-theme="tactics"] .bubble { border-color: #10271f; border-radius: 3px; box-shadow: 3px 3px 0 rgba(4,35,25,.34); }
+body.coboot-skin[data-theme="tactics"] .page-empty { margin: 28px; border: 2px solid #f6f2de; background: rgba(7,69,50,.64); color: #e4efdf; box-shadow: 5px 5px 0 rgba(4,35,25,.35); }
+body.coboot-skin[data-theme="tactics"] .page-empty .pe-title { color: #f6f2de; }
+body.coboot-skin[data-theme="tactics"] .page-empty .pe-icon { color: #ffd94d; opacity: 1; }
+body.coboot-skin[data-theme="tactics"] .msg.me .bubble { background: #ffd94d; }
+body.coboot-skin[data-theme="tactics"] .primary-btn,
+body.coboot-skin[data-theme="tactics"] .send-btn { background: #ffd94d; color: #10271f; }
+body.coboot-skin[data-theme="tactics"] .agent-heading h1 { font-family: Impact, "Arial Narrow", "Microsoft YaHei", sans-serif; color: #f6f2de; }
+body.coboot-skin[data-theme="tactics"] .agent-heading p { color: #e4efdf; }
+body.coboot-skin[data-theme="tactics"] .agent-heading h1::after { background: #ffd94d; border-color: #10271f; }
+
+@media (max-width: 700px) {
+  body.coboot-skin .settings-card[data-view="appearance"] { width: min(100%, calc(100vw - 24px)); padding: 22px 16px; }
+  body.coboot-skin .theme-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 9px; }
+  body.coboot-skin .theme-choice { min-height: 124px; grid-template-columns: 40px 1fr; padding: 10px; }
+  body.coboot-skin .theme-swatch { width: 40px; height: 68px; }
+}
+@media (max-width: 410px) {
+  body.coboot-skin .theme-grid { grid-template-columns: 1fr; }
+  body.coboot-skin .theme-choice { min-height: 98px; }
+}

@@ -1,0 +1,575 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>UniSci AI</title>
+  <link rel="stylesheet" href="/styles.css" />
+  <link rel="stylesheet" href="/coboot-theme.css?v=20260824-themes-2" />
+  <link rel="icon" type="image/png" href="/assets/brand/logo.png?v=unisci-transparent-2" />
+</head>
+<body class="coboot-skin auth-open onboarding-open" data-theme="station">
+  <section class="auth-gate" id="authGate" role="dialog" aria-modal="true" aria-labelledby="authTitle">
+    <div class="auth-card">
+      <div class="auth-brand"><img src="/assets/brand/logo.png" alt="" /><div><strong>UniSci AI</strong><small>本地科研工作空间</small></div></div>
+      <div class="auth-copy"><h1 id="authTitle">登录</h1></div>
+      <form id="authForm" novalidate>
+        <label><span>邮箱或手机号</span><input id="authLogin" type="text" autocomplete="username" required /></label>
+        <label><span>密码</span><input id="authPassword" type="password" autocomplete="current-password" required /></label>
+        <p class="auth-error hidden" id="authError" role="alert"></p>
+        <button class="auth-submit" id="authSubmit" type="submit">登录</button>
+      </form>
+      <button class="auth-switch" id="authSwitch" type="button">没有账户？注册</button>
+    </div>
+  </section>
+
+  <section class="onboarding" id="onboarding" role="dialog" aria-modal="true" aria-labelledby="onboardingTitle">
+    <div class="onboarding-shell">
+      <header class="onboarding-topbar">
+        <div class="onboarding-brand"><img src="/assets/brand/logo.png" alt="" /><strong>UniSci AI</strong></div>
+        <div class="onboarding-progress" aria-label="引导进度">
+          <span class="active" data-onboarding-dot="0"></span>
+          <span data-onboarding-dot="1"></span>
+          <em id="onboardingStepText">1 / 2</em>
+        </div>
+        <button class="onboarding-skip" id="onboardingSkip" type="button">跳过介绍</button>
+      </header>
+
+      <div class="onboarding-pages" id="onboardingPages">
+        <article class="onboarding-page active" data-onboarding-page="0">
+          <div class="onboarding-copy">
+            <p class="onboarding-kicker">一个课题组，多种专业判断</p>
+            <h1 id="onboardingTitle">让科研协作，<br><span>从一个问题开始。</span></h1>
+            <p class="onboarding-lead">选择一位科研员工深入讨论，或组建群聊让不同专业共同推进。协调员会拆解任务，但每个结论仍保留清晰的责任人与依据。</p>
+            <div class="onboarding-facts" aria-label="核心能力">
+              <div><strong>私聊</strong><span>与单一专业角色深挖问题</span></div>
+              <div><strong>群聊</strong><span>让多位员工分工、并行、汇总</span></div>
+              <div><strong>科研市场</strong><span>按研究阶段选择合适的专业员工</span></div>
+            </div>
+          </div>
+
+          <div class="collab-scene" aria-label="科研群聊与私聊示意">
+            <div class="scene-grid"></div>
+            <div class="scene-caption">课题讨论 · 自供电传感器</div>
+            <div class="scene-thread">
+              <div class="scene-message scene-question">
+                <span class="scene-avatar lead">研</span>
+                <div><b>研究目标</b><p>验证柔性压电结构在低频激励下的能量采集效率。</p></div>
+              </div>
+              <div class="scene-route"><i></i><span>协调员拆解为 3 个并行任务</span><i></i></div>
+              <div class="scene-workers">
+                <div class="scene-worker literature"><span>文</span><div><b>文献研究员</b><p>检索基准方案与评价指标</p></div><em>私聊</em></div>
+                <div class="scene-worker experiment"><span>试</span><div><b>实验设计师</b><p>定义对照、变量与采样计划</p></div><em>群聊</em></div>
+                <div class="scene-worker stats"><span>统</span><div><b>科研统计师</b><p>规划功效分析与模型诊断</p></div><em>群聊</em></div>
+              </div>
+              <div class="scene-synthesis"><span>结论汇总</span><p>路线、证据与风险在同一会话中持续收敛。</p></div>
+            </div>
+            <div class="scene-index"><span></span><span></span><span></span><span></span></div>
+          </div>
+        </article>
+
+        <article class="onboarding-page" data-onboarding-page="1">
+          <div class="onboarding-copy">
+            <p class="onboarding-kicker">专业知识，不止是附件</p>
+            <h1>把研究资料，<br><span>变成可追溯的依据。</span></h1>
+            <p class="onboarding-lead">上传文献、实验记录与方法文档。系统会生成语义索引，在聊天框按需挂载知识库，并把相关片段连同来源交给科研员工。</p>
+            <div class="onboarding-facts knowledge-facts" aria-label="知识库能力">
+              <div><strong>语义检索</strong><span>理解问题含义，而非只匹配关键词</span></div>
+              <div><strong>会话挂载</strong><span>不同课题只使用需要的资料范围</span></div>
+              <div><strong>来源可查</strong><span>查看全文、分块和每条引用依据</span></div>
+            </div>
+          </div>
+
+          <div class="knowledge-scene" aria-label="专业科研知识库检索示意">
+            <div class="knowledge-label"><span>专业科研知识库</span><em>语义索引已就绪</em></div>
+            <div class="document-stack">
+              <div class="source-document back"><i>PDF</i><span></span><span></span></div>
+              <div class="source-document middle"><i>DOC</i><span></span><span></span></div>
+              <div class="source-document front">
+                <header><i>MD</i><div><b>柔性压电传感综述</b><small>2,846 字 · 7 个片段</small></div></header>
+                <p></p><p></p><p class="short"></p>
+                <div class="chunk-mark one">01</div><div class="chunk-mark two">04</div>
+              </div>
+            </div>
+            <div class="semantic-flow"><span></span><i></i><i></i><i></i><b>语义检索</b></div>
+            <div class="retrieval-result">
+              <div class="result-query"><small>当前问题</small><p>低频下如何提高采集效率？</p></div>
+              <div class="result-citation"><span>命中片段 04</span><em>相关度 87%</em><p>增大有效应变并优化阻抗匹配，可改善低频能量转换效率……</p></div>
+              <div class="result-answer"><i>据</i><p>回答附带来源，可随时回看原文与分块。</p></div>
+            </div>
+          </div>
+        </article>
+      </div>
+
+      <footer class="onboarding-footer">
+        <p>约 30 秒了解核心工作方式</p>
+        <div class="onboarding-actions">
+          <button class="onboarding-back hidden" id="onboardingBack" type="button">上一步</button>
+          <button class="onboarding-next" id="onboardingNext" type="button">下一步：专业知识库
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M5 12h14M13 6l6 6-6 6"/></svg>
+          </button>
+        </div>
+      </footer>
+    </div>
+  </section>
+
+  <div id="app" aria-hidden="true">
+
+    <!-- ===== 最左：视图切换 ===== -->
+    <nav class="rail">
+      <div class="rail-nav">
+        <button class="rail-item active" data-view="chat" title="聊天">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z"/></svg>
+          <span>聊天</span>
+        </button>
+        <button class="rail-item" data-view="agents" title="科研市场">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="8" width="16" height="12" rx="3"/><path d="M12 8V4M8 3h8"/><circle cx="9" cy="14" r="1.2" fill="currentColor" stroke="none"/><circle cx="15" cy="14" r="1.2" fill="currentColor" stroke="none"/></svg>
+          <span>科研市场</span>
+        </button>
+        <button class="rail-item" data-view="kb" title="知识库">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/></svg>
+          <span>知识库</span>
+        </button>
+        <button class="rail-item" data-view="friends" id="friendsNavBtn" title="好友" aria-label="好友">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+          <span>好友</span>
+        </button>
+      </div>
+      <div class="rail-foot">
+        <button class="rail-help" id="settingsBtn" type="button" title="设置" aria-label="设置">设置</button>
+        <button class="rail-help" id="onboardingReplay" type="button" title="了解我们" aria-label="了解我们">了解我们</button>
+        <button class="rail-help" id="contactAuthor" type="button" title="联系作者" aria-label="联系作者">联系作者</button>
+      </div>
+    </nav>
+
+    <!-- ==================== 视图一：聊天 ==================== -->
+    <div class="view view-chat" id="viewChat">
+      <aside class="sidebar">
+        <div class="sb-top">
+          <div class="search-box">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><path d="M20.5 20.5l-4.6-4.6"/></svg>
+            <input type="text" id="convSearch" placeholder="搜索聊天" autocomplete="off" />
+          </div>
+          <div class="sb-add-wrap">
+            <button class="sb-add" id="newChatBtn" title="发起聊天">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.1" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>
+            </button>
+            <div class="sb-menu hidden" id="newChatMenu">
+              <button data-act="direct">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+                <div><b>单聊</b><i>和某一位智能体一对一</i></div>
+              </button>
+              <button data-act="group">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+                <div><b>群聊</b><i>多位智能体协作讨论</i></div>
+              </button>
+            </div>
+          </div>
+        </div>
+        <div class="sb-filter" id="convFilter">
+          <button class="sf-chip active" data-kind="all">全部</button>
+          <button class="sf-chip" data-kind="direct">单聊</button>
+          <button class="sf-chip" data-kind="group">群聊</button>
+        </div>
+        <div class="sb-list" id="convSwitch"></div>
+      </aside>
+
+      <main class="center-panel">
+        <header class="chat-head">
+          <div class="ch-avatar" id="chatAvatar"><span class="cha-fallback">研</span></div>
+          <div class="ch-main">
+            <div class="chat-title" id="chatTitle">选择一个聊天</div>
+            <div class="chat-sub" id="chatSub">或从「科研市场」里挑一位开始单聊</div>
+          </div>
+          <div class="ch-right">
+            <div class="ch-members" id="chatMembers"></div>
+            <div class="chat-status" id="chatStatus"></div>
+          </div>
+        </header>
+
+        <div class="chat-feed" id="chatFeed" aria-live="polite" aria-label="消息流"></div>
+
+        <button class="jump-latest" id="jumpLatest">回到最新 ↓</button>
+        <div class="typing-strip hidden" id="typingStrip"></div>
+
+        <div class="approval-bar hidden" id="approvalBar">
+          <div class="ga-inner">
+            <span class="ga-icon">!</span>
+            <span class="ga-text" id="gaText"></span>
+            <input type="text" class="ga-note" id="gaNote" placeholder="备注（可空）" />
+            <button class="approve-btn" id="gaApprove">批准</button>
+            <button class="reject-btn" id="gaReject">驳回</button>
+          </div>
+        </div>
+
+        <div class="composer">
+          <div class="composer-card" id="composerCard">
+            <div class="mention-hint hidden" id="mentionHint"></div>
+            <textarea id="input" rows="1" placeholder="发消息…"></textarea>
+            <div class="composer-toolbar">
+              <div class="ct-left">
+                <div class="kb-mount-wrap" id="kbMountWrap">
+                  <button class="kb-mount-btn" id="kbMountBtn" type="button" title="挂载知识库">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/></svg>
+                    <span id="kbMountLabel">知识库</span>
+                    <span class="kb-mount-count hidden" id="kbMountCount">0</span>
+                  </button>
+                  <div class="kb-pop hidden" id="kbPop">
+                    <div class="kb-pop-head">
+                      <span>挂载知识库</span>
+                      <span class="kb-pop-sub">选中后仅当前会话生效</span>
+                    </div>
+                    <div class="kb-pop-list" id="kbPopList" role="group" aria-label="选择知识库"></div>
+                  </div>
+                </div>
+                <div class="quick-mentions" id="quickMentions"></div>
+              </div>
+              <div class="ct-right">
+                <span class="kbd-hint">Enter 发送 · Shift+Enter 换行</span>
+                <button class="send-btn" id="sendBtn" title="发送(Enter)">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 2L11 13"/><path d="M22 2l-7 20-4-9-9-4 20-7z"/></svg>
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      </main>
+    </div>
+
+    <!-- ==================== 视图二：智能体 ==================== -->
+    <div class="view view-page hidden" id="viewAgents">
+      <section class="agent-catalog" id="agentCatalog">
+        <header class="page-head agent-page-head">
+          <div class="agent-heading">
+            <div>
+              <h1>科研市场</h1>
+              <p>汇聚科研各领域的专家智能体，配置角色、知识与能力，协作攻克研究问题。</p>
+            </div>
+            <button class="primary-btn" id="newAgentBtn">
+              <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>
+              新建智能体
+            </button>
+          </div>
+          <div class="agent-toolbar">
+            <div class="search-box lg">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><path d="M20.5 20.5l-4.6-4.6"/></svg>
+              <input type="text" id="agentSearch" placeholder="搜索名称、职责或技能" autocomplete="off" />
+            </div>
+          </div>
+          <div class="cat-bar" id="agentCats" aria-label="智能体分类"></div>
+        </header>
+        <div class="page-body agent-page-body"><div class="card-grid agent-grid" id="agentGrid"></div></div>
+      </section>
+
+      <section class="agent-config hidden" id="agentConfigView" aria-labelledby="agentConfigTitle">
+        <header class="agent-config-bar">
+          <div class="agent-config-nav">
+            <button class="agent-back" id="aBack" aria-label="返回智能体列表">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M19 12H5M12 19l-7-7 7-7"/></svg>
+            </button>
+            <div>
+              <div class="agent-config-kicker" id="aConfigKicker">智能体配置</div>
+              <h1 id="agentConfigTitle">配置智能体</h1>
+            </div>
+          </div>
+          <div class="agent-config-state" id="aDirtyState" aria-live="polite">所有更改已保存</div>
+          <div class="agent-config-actions">
+            <button class="danger-quiet hidden" id="aDelete">删除</button>
+            <button class="ghost-btn" id="aCancel">放弃更改</button>
+            <button class="primary-btn" id="aSave">保存更改</button>
+          </div>
+        </header>
+
+        <div class="agent-config-scroll">
+          <div class="agent-config-layout">
+            <main class="agent-config-main">
+              <section class="config-section" aria-labelledby="identityTitle">
+                <div class="config-section-head compact-section-head">
+                  <h2 id="identityTitle">基本信息</h2>
+                </div>
+                <div class="identity-grid">
+                  <label class="config-field field-name"><span>名称 <b>*</b></span><input id="aName" type="text" placeholder="例如：材料研究员" autocomplete="off" /></label>
+                  <label class="config-field"><span>@ 识别名</span><div class="input-prefix"><i>@</i><input id="aMention" type="text" placeholder="materials" autocomplete="off" /></div></label>
+                  <label class="config-field"><span>分类</span><input id="aCategory" type="text" list="aCategoryList" placeholder="工程 / 硬件 / 学术…" autocomplete="off" /><datalist id="aCategoryList"></datalist></label>
+                  <label class="config-field"><span>技能标签</span><input id="aSkills" type="text" placeholder="用逗号分隔，如 算法复现, 代码评审" autocomplete="off" /></label>
+                </div>
+                <div class="avatar-setting">
+                  <span class="avatar-label">头像</span>
+                  <div class="avatar-control">
+                    <input id="aAvatar" type="hidden" value="研" />
+                    <div class="avatar-options" id="aAvatarOptions" role="group" aria-label="选择头像"></div>
+                    <div class="avatar-upload-row">
+                      <label class="avatar-upload-btn" for="aAvatarUpload">上传头像</label>
+                      <input id="aAvatarUpload" type="file" accept="image/png,image/jpeg,image/webp,image/gif" />
+                      <span class="avatar-upload-status" id="aAvatarUploadStatus" aria-live="polite">未上传</span>
+                    </div>
+                  </div>
+                </div>
+              </section>
+
+              <section class="config-section" aria-labelledby="promptTitle">
+                <div class="config-section-head compact-section-head">
+                  <h2 id="promptTitle">行为指令</h2>
+                  <span class="prompt-count" id="aPromptCount">0 字</span>
+                </div>
+                <label class="config-field"><span class="sr-only">系统提示词</span><textarea id="aPrompt" rows="11" placeholder="输入智能体的职责、边界与输出要求。"></textarea></label>
+              </section>
+
+              <section class="config-section" aria-labelledby="knowledgeTitle">
+                <div class="agent-kb-head compact-section-head">
+                  <h2 id="knowledgeTitle">专属知识库</h2>
+                  <span id="aKbCount">继承会话</span>
+                </div>
+                <div class="agent-kb-picker" id="aKbPicker" role="group" aria-label="选择专属知识库"></div>
+              </section>
+            </main>
+          </div>
+        </div>
+      </section>
+    </div>
+
+    <!-- ==================== 视图三：知识库 ==================== -->
+    <div class="view view-page hidden" id="viewKb">
+      <header class="page-head kb-page-head">
+        <div class="agent-heading">
+          <div>
+            <h1>知识库</h1>
+            <p>沉淀文献、实验记录与研究资料，为当前会话提供可追溯的检索依据。</p>
+          </div>
+          <button class="primary-btn" id="newKbBtn">
+            <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>
+            新建知识库
+          </button>
+        </div>
+        <div class="ph-row">
+          <div class="search-box lg">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><path d="M20.5 20.5l-4.6-4.6"/></svg>
+            <input type="text" id="kbSearch" placeholder="搜索名称或描述" autocomplete="off" />
+          </div>
+        </div>
+      </header>
+      <div class="page-body"><div class="card-grid" id="kbGrid"></div></div>
+    </div>
+
+    <!-- ==================== 视图四：好友 ==================== -->
+    <div class="view view-page hidden" id="viewFriends">
+      <header class="page-head kb-page-head">
+        <div class="agent-heading">
+          <div>
+            <h1>好友</h1>
+            <p>通过用户 ID 添加好友，与好友私聊，或组建多人多 Agent 群聊。</p>
+          </div>
+        </div>
+      </header>
+      <div class="page-body">
+        <div class="friends-page">
+          <div class="friends-add-card">
+            <div class="friends-add-title">添加好友</div>
+            <div class="friend-add-row">
+              <input id="friendUserId" type="text" placeholder="输入对方的用户 ID，如 user_xxxx" autocomplete="off" />
+              <button class="primary-btn" id="friendAddBtn" type="button">发送申请</button>
+            </div>
+          </div>
+          <div class="friends-cols">
+            <section class="friends-section">
+              <div class="friends-section-title">好友申请</div>
+              <div class="friend-list" id="friendRequestsList"></div>
+            </section>
+            <section class="friends-section">
+              <div class="friends-section-title">我的好友</div>
+              <div class="friend-list" id="friendsList"></div>
+            </section>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ===== 抽屉：知识库详情 ===== -->
+  <div class="drawer-mask hidden" id="kbDrawerMask">
+    <aside class="drawer" id="kbDrawer">
+      <div class="dw-head">
+        <div>
+          <div class="dw-title" id="dwTitle">知识库</div>
+          <div class="dw-sub" id="dwSub"></div>
+        </div>
+        <button class="icon-btn" id="dwClose" title="关闭">
+          <svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M18 6L6 18M6 6l12 12"/></svg>
+        </button>
+      </div>
+      <div class="dw-body" id="dwBody"></div>
+    </aside>
+  </div>
+
+  <!-- ===== 模态：单聊选人 ===== -->
+  <div class="modal hidden" id="directModal" role="dialog" aria-modal="true" aria-labelledby="directModalTitle">
+    <div class="modal-card agent-picker-modal">
+      <div class="modal-title" id="directModalTitle">发起单聊</div>
+      <div class="modal-sub">选择一位智能体开始一对一交流。</div>
+      <div class="pick-list" id="directPickList"></div>
+      <div class="modal-actions">
+        <div></div>
+        <div class="modal-actions-right"><button class="ghost-btn sm" id="directCancel">取消</button></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ===== 模态：建群 ===== -->
+  <div class="modal hidden" id="groupModal" role="dialog" aria-modal="true" aria-labelledby="wizardTitle">
+    <div class="modal-card agent-picker-modal">
+      <div class="wizard-dots" id="wizardDots"></div>
+      <div class="modal-title" id="wizardTitle">群名称</div>
+      <div class="modal-sub" id="wizardSub">给这个群起个名字</div>
+      <div id="wizardBody"></div>
+      <div class="modal-actions">
+        <button class="ghost-btn sm hidden" id="groupPrev">上一步</button>
+        <div class="modal-actions-right">
+          <button class="ghost-btn sm" id="groupCancel">取消</button>
+          <button class="primary-btn sm" id="groupNext">下一步</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ===== 模态：新建知识库 ===== -->
+  <div class="modal hidden" id="kbModal" role="dialog" aria-modal="true" aria-labelledby="kbModalTitle">
+    <div class="modal-card">
+      <div class="modal-title" id="kbModalTitle">新建知识库</div>
+      <div class="modal-sub">创建后可上传文档，智能体能检索并引用其中内容</div>
+      <label class="field-label">名称 <span class="req">*</span></label>
+      <input type="text" id="kbName" placeholder="如：课题组资料库" />
+      <label class="field-label">描述</label>
+      <input type="text" id="kbDesc" placeholder="可选" />
+      <div class="modal-actions">
+        <div></div>
+        <div class="modal-actions-right">
+          <button class="ghost-btn sm" id="kbCancel">取消</button>
+          <button class="primary-btn sm" id="kbCreate">创建</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="reconnect-toast hidden" id="reconnectToast">
+    <span class="rt-dot"></span>
+    <span id="reconnectText">连接断开，正在重连…</span>
+    <button class="rt-close" id="rtClose">&times;</button>
+  </div>
+
+  <div class="modal hidden" id="contactModal" role="dialog" aria-modal="true" aria-label="作者微信二维码">
+    <div class="modal-mask"></div>
+    <div class="modal-card contact-card">
+      <button class="modal-close" id="contactClose" type="button" aria-label="关闭">×</button>
+      <img class="contact-qr-img" src="/assets/author-wechat.jpg" alt="作者微信二维码" />
+    </div>
+  </div>
+
+  <div class="modal hidden" id="settingsModal" role="dialog" aria-modal="true" aria-labelledby="settingsTitle">
+    <div class="modal-mask"></div>
+    <div class="modal-card settings-card" data-view="main">
+      <button class="modal-close" id="settingsClose" type="button" aria-label="关闭">×</button>
+      <button class="back-btn" id="settingsBackBtn" type="button" hidden>‹ 返回</button>
+
+      <div class="settings-pane" data-settings-view="main">
+        <p class="settings-kicker">账户</p>
+        <h2 id="settingsTitle">账户设置</h2>
+        <div class="settings-profile">
+          <div class="settings-avatar" id="settingsAvatar" aria-hidden="true">—</div>
+          <div class="settings-profile-meta">
+            <p class="settings-name" id="settingsName">—</p>
+            <p class="settings-login" id="settingsLogin">—</p>
+          </div>
+          <button class="row-btn" id="profileEditBtn" type="button">编辑资料</button>
+        </div>
+        <div class="user-id-card"><span>我的用户 ID</span><code id="settingsUserId">—</code><button class="row-btn" id="copyUserIdBtn" type="button">复制</button></div>
+        <ul class="settings-list">
+          <li class="appearance-row"><div><span>界面主题</span><small id="settingsThemeName">换乘站</small></div><button class="row-btn" id="openAppearanceBtn" type="button">切换</button></li>
+          <li><div><span>好友</span><small>通过用户 ID 添加好友、处理申请</small></div><button class="row-btn" id="openFriendsBtn" type="button">管理</button></li>
+          <li><div><span>修改密码</span><small>用当前密码更新登录密码</small></div><button class="row-btn" id="openPasswordBtn" type="button">修改</button></li>
+          <li class="settings-logout-row"><button class="settings-logout" id="logoutBtn" type="button">退出登录</button></li>
+        </ul>
+      </div>
+
+      <div class="settings-pane appearance-pane" data-settings-view="appearance" hidden>
+        <p class="settings-kicker">外观工作台</p>
+        <h2>选择界面主题</h2>
+        <p class="appearance-lead">每套主题均覆盖聊天、市场、知识库、配置和弹窗。选择后会为当前账户保存。</p>
+        <p class="theme-current" id="themeCurrentDescription">当前使用：换乘站</p>
+        <div class="theme-grid" role="group" aria-label="界面主题">
+          <button class="theme-choice station active" type="button" data-theme-choice="station" aria-pressed="true"><span class="theme-swatch"><i></i><i></i><i></i></span><strong>换乘站</strong><small>Tip 02 · 紫色线路与票签</small></button>
+          <button class="theme-choice authority" type="button" data-theme-choice="authority" aria-pressed="false"><span class="theme-swatch"><i></i><i></i><i></i></span><strong>授权档案</strong><small>Tip 03 · 纸张、印章与契约</small></button>
+          <button class="theme-choice editorial" type="button" data-theme-choice="editorial" aria-pressed="false"><span class="theme-swatch"><i></i><i></i><i></i></span><strong>内容印刷</strong><small>Tip 06 · 红色海报与出版台</small></button>
+          <button class="theme-choice archive" type="button" data-theme-choice="archive" aria-pressed="false"><span class="theme-swatch"><i></i><i></i><i></i></span><strong>知识档案馆</strong><small>Tip 07 · 木柜、索引与资料卡</small></button>
+          <button class="theme-choice lab" type="button" data-theme-choice="lab" aria-pressed="false"><span class="theme-swatch"><i></i><i></i><i></i></span><strong>工程接线台</strong><small>Tip 09 · 端口、连线与状态灯</small></button>
+          <button class="theme-choice subagents" type="button" data-theme-choice="subagents" aria-pressed="false"><span class="theme-swatch"><i></i><i></i><i></i></span><strong>Subagent 漫画</strong><small>Tip 10 · 分镜、速度线与并行</small></button>
+          <button class="theme-choice ledger" type="button" data-theme-choice="ledger" aria-pressed="false"><span class="theme-swatch"><i></i><i></i><i></i></span><strong>协作账本</strong><small>Tip 11 · 薄荷账页与清晰明细</small></button>
+          <button class="theme-choice theatre" type="button" data-theme-choice="theatre" aria-pressed="false"><span class="theme-swatch"><i></i><i></i><i></i></span><strong>群聊剧场</strong><small>Tip 12 · 日落桃粉与主动对话</small></button>
+          <button class="theme-choice tactics" type="button" data-theme-choice="tactics" aria-pressed="false"><span class="theme-swatch"><i></i><i></i><i></i></span><strong>团队战术板</strong><small>Tip 14 · 球场绿与协作路线</small></button>
+        </div>
+      </div>
+
+      <div class="settings-pane" data-settings-view="profile" hidden>
+        <p class="settings-kicker">编辑资料</p>
+        <h2>用户名与头像</h2>
+        <form id="profileForm" novalidate>
+          <div class="profile-avatar-row">
+            <div class="profile-avatar-preview" id="profileAvatarPreview" aria-hidden="true">—</div>
+            <div class="profile-avatar-actions">
+              <label class="row-btn" for="profileAvatarUpload">上传头像</label>
+              <input id="profileAvatarUpload" type="file" accept="image/png,image/jpeg,image/webp,image/gif" />
+              <button class="ghost-btn sm" id="profileAvatarReset" type="button">恢复默认</button>
+            </div>
+          </div>
+          <label><span>用户名</span><input id="profileName" type="text" autocomplete="off" maxlength="24" required /></label>
+          <p class="profile-error hidden" id="profileError" role="alert"></p>
+          <div class="modal-actions">
+            <div></div>
+            <div class="modal-actions-right"><button class="ghost-btn sm" id="profileCancel" type="button">取消</button><button class="primary-btn sm" id="profileSave" type="submit">保存</button></div>
+          </div>
+        </form>
+      </div>
+
+      <div class="settings-pane" data-settings-view="password" hidden>
+        <p class="settings-kicker">账户安全</p>
+        <h2>修改密码</h2>
+        <form id="passwordForm" novalidate>
+          <label><span>原密码</span><input id="currentPassword" type="password" autocomplete="current-password" required /></label>
+          <label><span>新密码</span><input id="newPassword" type="password" autocomplete="new-password" required /></label>
+          <label><span>确认新密码</span><input id="confirmPassword" type="password" autocomplete="new-password" required /></label>
+          <p class="password-error hidden" id="passwordError" role="alert"></p>
+          <div class="modal-actions">
+            <div></div>
+            <div class="modal-actions-right"><button class="ghost-btn sm" id="passwordCancel" type="button">取消</button><button class="primary-btn sm" type="submit">更新密码</button></div>
+          </div>
+        </form>
+      </div>
+    </div>
+  </div>
+
+  <div class="modal hidden" id="avatarCropModal" role="dialog" aria-modal="true" aria-labelledby="avatarCropTitle" aria-describedby="avatarCropHint">
+    <div class="modal-card avatar-crop-card">
+      <div class="avatar-crop-head">
+        <div>
+          <p class="settings-kicker">头像编辑</p>
+          <h2 id="avatarCropTitle">调整头像</h2>
+          <p id="avatarCropHint">拖动图片调整位置，使用滑杆缩放。将保存为方形头像。</p>
+        </div>
+        <button class="modal-close" id="avatarCropClose" type="button" aria-label="取消裁剪">×</button>
+      </div>
+      <div class="avatar-crop-stage" id="avatarCropStage">
+        <canvas id="avatarCropCanvas" width="360" height="360" aria-label="头像裁剪预览"></canvas>
+      </div>
+      <label class="avatar-crop-zoom" for="avatarCropZoom"><span>缩放</span><input id="avatarCropZoom" type="range" min="1" max="3" step="0.01" value="1" /><output id="avatarCropZoomValue" for="avatarCropZoom">100%</output></label>
+      <p class="avatar-crop-error hidden" id="avatarCropError" role="alert"></p>
+      <div class="modal-actions avatar-crop-actions">
+        <div></div>
+        <div class="modal-actions-right"><button class="ghost-btn sm" id="avatarCropCancel" type="button">取消</button><button class="primary-btn sm" id="avatarCropConfirm" type="button">确认头像</button></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="toast-stack" id="toastStack" role="status" aria-live="polite" aria-label="操作反馈"></div>
+
+  <script src="/app.js"></script>
+</body>
+</html>

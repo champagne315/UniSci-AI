@@ -1,0 +1,23 @@
+{
+  "name": "unisci-ai",
+  "version": "0.1.0",
+  "description": "UniSci AI 科研协作平台 —— 群聊 + @ 路由 + 可定制专家 Agent + RAG + HITL 审批",
+  "type": "commonjs",
+  "main": "server/server.js",
+  "scripts": {
+    "start": "node server/server.js",
+    "dev": "node server/server.js",
+    "test:semantic": "node test/semantic_kb_test.js"
+  },
+  "engines": {
+    "node": ">=18"
+  },
+  "private": true,
+  "dependencies": {
+    "@langchain/core": "1.2",
+    "@langchain/langgraph": "1.4",
+    "@langchain/openai": "1.5",
+    "mammoth": "^1.12.1",
+    "pdf-parse": "^1.1.1"
+  }
+}
