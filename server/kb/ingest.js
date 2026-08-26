@@ -7,6 +7,7 @@
 
 const fs = require("fs");
 const path = require("path");
+const { PDFDocument } = require("pdf-lib");
 const { embed } = require("./embed");
 const { semanticEmbedder } = require("./semantic");
 const config = require("../config");
@@ -48,16 +49,12 @@ async function extractDocxText(filePath) {
 }
 
 // 用智谱 GLM-OCR 识别图片 / PDF 为 Markdown 文本（data URL 传文件）
-async function extractImageText(filePath) {
+async function extractOcrDataUrl(dataUrl, timeoutMs = config.glmOcrTimeoutMs) {
   if (!config.glmOcrApiKey) {
     throw new Error("未配置 GLM_OCR_API_KEY，无法识别图片（请在 .env 中填写智谱 API key）");
   }
-  const ext = path.extname(filePath).toLowerCase();
-  const mime = IMAGE_MIME[ext] || "application/pdf";
-  const dataUrl = "data:" + mime + ";base64," + fs.readFileSync(filePath).toString("base64");
-
   const controller = new AbortController();
-  const timer = setTimeout(() => controller.abort(), config.glmOcrTimeoutMs);
+  const timer = setTimeout(() => controller.abort(), timeoutMs);
   let res;
   try {
     res = await fetch(config.glmOcrBaseUrl, {
@@ -80,6 +77,40 @@ async function extractImageText(filePath) {
   return String(body.md_results || "");
 }
 
+async function extractImageText(filePath) {
+  const ext = path.extname(filePath).toLowerCase();
+  const mime = IMAGE_MIME[ext] || "application/pdf";
+  const dataUrl = "data:" + mime + ";base64," + fs.readFileSync(filePath).toString("base64");
+  return extractOcrDataUrl(dataUrl);
+}
+
+// GLM-OCR 单次仅支持 50MB / 100 页以内的 PDF；扫描书籍会按页拆分后完整识别。
+async function extractLargePdfText(filePath) {
+  const source = await PDFDocument.load(fs.readFileSync(filePath), { ignoreEncryption: true });
+  const pageCount = source.getPageCount();
+  const texts = [];
+  for (let start = 0; start < pageCount;) {
+    let end = Math.min(start + 90, pageCount);
+    let bytes;
+    while (end > start) {
+      const segment = await PDFDocument.create();
+      const pages = await segment.copyPages(source, Array.from({ length: end - start }, (_, index) => start + index));
+      pages.forEach((page) => segment.addPage(page));
+      bytes = await segment.save();
+      if (bytes.length <= 48 * 1024 * 1024 || end === start + 1) break;
+      end = start + Math.max(1, Math.floor((end - start) / 2));
+    }
+    if (!bytes || bytes.length > 50 * 1024 * 1024) throw new Error("PDF 第 " + (start + 1) + " 页单页仍超过 OCR 50MB 限制");
+    const text = await extractOcrDataUrl(
+      "data:application/pdf;base64," + Buffer.from(bytes).toString("base64"),
+      Math.max(config.glmOcrTimeoutMs, 180000),
+    );
+    if (text.trim()) texts.push("<!-- PDF 第 " + (start + 1) + "–" + end + " 页 -->\n" + text);
+    start = end;
+  }
+  return texts.join("\n\n");
+}
+
 function readText(filePath) {
   const ext = path.extname(filePath).toLowerCase();
   if (!TEXT_EXT.has(ext)) return null;
@@ -93,6 +124,14 @@ async function readFileText(filePath) {
   if (ext === ".docx") return extractDocxText(filePath);
   if (IMAGE_EXT.has(ext)) return extractImageText(filePath);
   if (ext === ".pdf") {
+    // 超大 PDF 跳过 pdf-parse 和整文件 Base64，避免解析 50MB+ 扫描书籍时耗尽服务内存。
+    const isLargePdf = fs.statSync(filePath).size > 48 * 1024 * 1024;
+    if (isLargePdf) {
+      const text = await extractLargePdfText(filePath);
+      if (String(text).trim()) return text;
+      throw new Error("分段 OCR 未提取到可识别的文字");
+    }
+
     // 先尝试提取 PDF 文字层；扫描件再回退到 OCR，并保留两阶段的失败原因。
     let pdfError = null;
     try {
@@ -107,10 +146,16 @@ async function readFileText(filePath) {
       if (String(text).trim()) return text;
       throw new Error("OCR 未提取到可识别的文字");
     } catch (ocrError) {
-      const pdfReason = pdfError
-        ? "PDF 文字层提取失败：" + pdfError.message
-        : "PDF 未包含可提取的文字层";
-      throw new Error(pdfReason + "；OCR 处理失败：" + ocrError.message);
+      try {
+        const text = await extractLargePdfText(filePath);
+        if (String(text).trim()) return text;
+        throw new Error("分段 OCR 未提取到可识别的文字");
+      } catch (largePdfError) {
+        const pdfReason = pdfError
+          ? "PDF 文字层提取失败：" + pdfError.message
+          : "PDF 未包含可提取的文字层";
+        throw new Error(pdfReason + "；OCR 处理失败：" + ocrError.message + "；分段 OCR 处理失败：" + largePdfError.message);
+      }
     }
   }
   return null;
@@ -184,7 +229,7 @@ async function buildDocument(name, text, embedder = semanticEmbedder) {
   return doc;
 }
 
-async function ingestFile(kb, filePath, originalName) {
+async function ingestFile(kb, filePath, originalName, embedder = semanticEmbedder) {
   const text = await readFileText(filePath);
   if (text == null) {
     throw new Error(`暂不支持该文件类型：${path.extname(filePath)}（支持纯文本、PDF、Word .docx、图片）`);
@@ -192,7 +237,7 @@ async function ingestFile(kb, filePath, originalName) {
   if (!String(text).trim()) {
     throw new Error("未能从该文件中提取到文本内容（图片中可能没有可识别的文字）");
   }
-  const doc = await buildDocument(originalName || path.basename(filePath), text);
+  const doc = await buildDocument(originalName || path.basename(filePath), text, embedder);
   kb.docs.push(doc);
   if (kb._store) kb._store.persist(kb);
   return doc;

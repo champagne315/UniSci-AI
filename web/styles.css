@@ -299,8 +299,8 @@ body.onboarding-open { overflow: hidden; }
   outline-offset: 2px;
   border-radius: var(--r-sm);
 }
-/* 圆形元素（头像、发送键）用圆形焦点环 */
-.cm-avatar:focus-visible, .send-btn:focus-visible,
+/* 圆形元素（发送键等）用圆形焦点环 */
+.send-btn:focus-visible,
 .rail-logo:focus-visible, .rail-item:focus-visible,
 .icon-btn:focus-visible, .sb-add:focus-visible {
   outline-offset: 1px;
@@ -442,7 +442,7 @@ input:focus-visible, textarea:focus-visible, select:focus-visible {
   width: 44px; height: 44px; flex-shrink: 0; overflow: hidden; border-radius: var(--r);
   display: grid; place-items: center; font-size: 21px; line-height: 1;
 }
-.ac-avatar img, .cia img, .cha img, .cm-avatar img, .msg-avatar img, .mh-av img { display: block; width: 100%; height: 100%; object-fit: cover; object-position: center; }
+.ac-avatar img, .cia img, .cha img, .msg-avatar img, .mh-av img { display: block; width: 100%; height: 100%; object-fit: cover; object-position: center; }
 .ac-body { flex: 1; min-width: 0; }
 .ac-name { display: flex; align-items: center; gap: 7px; min-width: 0; line-height: var(--lh-snug); }
 .ac-name-text { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: var(--t-title); font-weight: var(--w-strong); }
@@ -461,6 +461,20 @@ input:focus-visible, textarea:focus-visible, select:focus-visible {
 .chat-cta:hover { color: var(--ink); background: var(--surface-2); }
 .ac-edit { border: 1px solid var(--line-2); background: var(--surface); color: var(--ink); }
 .ac-edit:hover { border-color: var(--brand); color: var(--brand-deep); background: var(--brand-soft); }
+
+/* Skill 市场：能力包以方法、边界和工具摘要为主，不复用 Agent 身份卡。 */
+.skill-grid { grid-template-columns: repeat(auto-fill, minmax(340px, 1fr)); gap: 14px; }
+.skill-card { min-height: 224px; display: flex; flex-direction: column; padding: 18px; border: 1px solid var(--line); border-radius: var(--r); background: var(--surface); transition: border-color .16s, box-shadow .16s, transform .16s; }
+.skill-card:hover { border-color: var(--brand-soft-2); box-shadow: var(--sh-sm); transform: translateY(-1px); }
+.skill-card-top { display: flex; gap: 11px; align-items: flex-start; }
+.skill-glyph { width: 38px; height: 38px; flex: 0 0 auto; display: grid; place-items: center; border-radius: 12px; color: var(--brand-deep); background: var(--brand-soft); font-size: 19px; }
+.skill-card-top h2 { margin: 0; color: var(--ink); font-size: var(--t-title); font-weight: var(--w-strong); line-height: var(--lh-snug); }
+.skill-card-top p { margin: 3px 0 0; color: var(--ink-3); font-size: var(--t-meta); }
+.skill-desc { min-height: 43px; margin: 14px 0 0; color: var(--ink-2); font-size: var(--t-label); line-height: var(--lh-label); display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+.skill-tags { display: flex; flex-wrap: wrap; gap: 5px; min-height: 23px; margin-top: 10px; }
+.skill-tool-chip { background: var(--brand-soft); color: var(--brand-deep); }
+.skill-card-foot { display: flex; align-items: center; gap: 12px; margin-top: auto; padding-top: 15px; border-top: 1px solid var(--line); color: var(--ink-3); font-size: var(--t-meta); }
+.skill-card-foot .ac-edit { margin-left: auto; }
 
 /* 知识库卡片 */
 .k-card {
@@ -687,24 +701,6 @@ input:focus-visible, textarea:focus-visible, select:focus-visible {
 .chat-sub { font-size: var(--t-meta); color: var(--ink-2); margin-top: 2px; font-variant-numeric: tabular-nums; }
 .ch-right { display: flex; align-items: center; gap: 12px; flex-shrink: 0; }
 
-.ch-members { display: flex; align-items: center; }
-.cm-avatar {
-  width: 27px; height: 27px; border-radius: 50%;
-  display: grid; place-items: center; font-size: var(--t-label); line-height: 1;
-  margin-left: -7px; border: 2px solid var(--surface);
-  cursor: pointer; position: relative; transition: transform .16s;
-}
-.cm-avatar:first-child { margin-left: 0; }
-.cm-avatar:hover { transform: translateY(-3px); z-index: 3; }
-.cm-avatar::after {
-  content: ""; position: absolute; right: -1px; bottom: -1px;
-  width: 8px; height: 8px; border-radius: 50%;
-  border: 1.6px solid var(--surface); background: var(--ink-4);
-}
-.cm-avatar[data-status="thinking"]::after { background: var(--warn); animation: pulse 1.2s infinite; }
-.cm-avatar[data-status="speaking"]::after { background: var(--brand); animation: pulse .8s infinite; }
-.cm-avatar[data-status="done"]::after { background: var(--brand); }
-
 .chat-status { font-size: var(--t-label); color: var(--ink-2); white-space: nowrap; }
 .chat-status.running { color: var(--brand-deep); font-weight: var(--w-strong); }
 .chat-status.running::before {
@@ -817,6 +813,26 @@ input:focus-visible, textarea:focus-visible, select:focus-visible {
 }
 .streaming-reasoning summary { color: var(--warn); border-color: var(--warn-line); background: var(--warn-soft); }
 .streaming-reasoning .reasoning-body { max-height: 104px; overflow-y: auto; }
+
+.tool-trace { display: grid; gap: 5px; margin: 0 0 7px; max-width: 100%; }
+.tool-call, .tool-live {
+  border: 1px solid var(--line); background: rgba(255, 255, 255, .72);
+  border-radius: var(--r-sm); font-size: var(--t-meta); color: var(--ink-2);
+}
+.tool-call summary, .tool-live { display: flex; align-items: center; gap: 7px; padding: 6px 9px; list-style: none; }
+.tool-call summary { cursor: pointer; }
+.tool-call summary::-webkit-details-marker { display: none; }
+.tool-call b, .tool-live b { color: var(--ink); font-size: var(--t-label); }
+.tool-call em, .tool-live em { margin-left: auto; color: var(--ink-3); font-style: normal; }
+.tool-dot { width: 7px; height: 7px; border-radius: 50%; background: var(--brand); box-shadow: 0 0 0 3px var(--brand-soft); flex: 0 0 auto; }
+.tool-call.failed .tool-dot, .tool-live.failed .tool-dot { background: var(--danger); box-shadow: 0 0 0 3px var(--danger-soft); }
+.tool-call.waiting_approval .tool-dot, .tool-live.waiting_approval .tool-dot { background: var(--warn); box-shadow: 0 0 0 3px var(--warn-soft); }
+.tool-live.running .tool-dot { animation: pulse 1s infinite; }
+.tool-call-body { border-top: 1px solid var(--line); padding: 8px 10px; }
+.tool-call-body code { display: block; white-space: pre-wrap; overflow-wrap: anywhere; color: var(--ink-2); font-size: 11px; line-height: 1.45; }
+.tool-call-body p, .tool-live small { margin: 6px 0 0; color: var(--ink-3); overflow-wrap: anywhere; }
+.tool-live { display: grid; grid-template-columns: auto auto 1fr auto; }
+.tool-live small { grid-column: 2 / -1; margin-top: 0; }
 /* 光标用盒子而非 ▋ 字形：不同平台的 ▋ 字面框高于正文，逐字追加时会让最后一行反复跳动 */
 .msg.streaming .stream-text::after {
   content: ""; display: inline-block; vertical-align: text-bottom;
@@ -1144,6 +1160,12 @@ input:focus-visible, textarea:focus-visible, select:focus-visible {
   display: grid; place-items: center; color: var(--ink-3); transition: all .15s;
 }
 .icon-btn:hover { background: var(--surface-3); color: var(--ink); }
+.icon-btn:focus-visible { outline: 2px solid var(--brand); outline-offset: 2px; }
+.group-members-btn { width: 32px; height: 32px; border: 1px solid var(--line-2); }
+.group-members-btn svg { width: 17px; height: 17px; }
+.group-invite-btn { display: inline-flex; align-items: center; gap: 6px; min-height: 32px; padding: 6px 10px; white-space: nowrap; }
+.group-invite-btn svg { width: 14px; height: 14px; }
+.group-member-permission-hint { margin: 16px 0 0; padding: 10px 12px; border: 1px solid var(--line-2); border-radius: var(--r-sm); color: var(--ink-2); background: var(--surface-2); font-size: var(--t-label); line-height: var(--lh-label); }
 
 /* ==========================================================================
    模态
@@ -1162,6 +1184,27 @@ input:focus-visible, textarea:focus-visible, select:focus-visible {
 }
 @keyframes modalIn { from { opacity: 0; transform: translateY(14px) scale(.98) } to { opacity: 1; transform: none } }
 .modal-card.wide { width: 640px; }
+.group-members-modal { width: 640px; }
+.group-members-head, .group-section-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 16px; }
+.group-members-head > .icon-btn { flex: 0 0 auto; font-size: 22px; line-height: 1; }
+.group-members-list { display: grid; gap: 8px; }
+.group-member-row { display: flex; align-items: center; gap: 11px; min-height: 58px; padding: 9px 10px; border: 1px solid var(--line-2); border-radius: var(--r-sm); background: var(--surface); }
+.group-member-avatar { width: 36px; height: 36px; overflow: hidden; flex: 0 0 36px; border-radius: 50%; background: var(--surface-2); }
+.group-member-avatar img { display: block; width: 100%; height: 100%; object-fit: cover; }
+.group-member-main { min-width: 0; flex: 1; }
+.group-member-main b, .group-member-main small { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.group-member-main small { margin-top: 3px; color: var(--ink-3); font-size: var(--t-meta); }
+.group-owner-badge, .group-agent-badge { flex: 0 0 auto; border-radius: var(--r-full); padding: 3px 7px; font-size: var(--t-micro); font-weight: var(--w-strong); }
+.group-owner-badge { color: var(--brand-deep); background: var(--brand-soft); }
+.group-agent-badge { color: var(--ink-2); background: var(--surface-3); }
+.group-member-remove { flex: 0 0 auto; }
+.group-member-divider { margin: 10px 0 0; padding: 5px 2px 1px; color: var(--ink-3); font-size: var(--t-meta); font-weight: var(--w-strong); }
+.group-invite-section { margin-top: 20px; padding-top: 18px; border-top: 1px solid var(--line); }
+.group-section-head { align-items: center; margin-bottom: 11px; }
+.group-section-head b, .group-section-head small { display: block; }
+.group-section-head small { margin-top: 3px; color: var(--ink-3); font-size: var(--t-meta); }
+.group-invite-list { max-height: 248px; }
+.group-invite-empty { display: grid; place-items: center; grid-column: 1 / -1; min-height: 74px; padding: 10px; color: var(--ink-3); font-size: var(--t-label); text-align: center; border: 1px dashed var(--line-2); border-radius: var(--r-sm); }
 .modal-title { font-size: var(--t-display); font-weight: var(--w-strong); line-height: var(--lh-snug); }
 .modal-sub { font-size: var(--t-label); color: var(--ink-2); margin-top: 5px; margin-bottom: 18px; line-height: var(--lh-label); }
 .pick-section { margin: 16px 0; }
@@ -1246,8 +1289,10 @@ input:focus-visible, textarea:focus-visible, select:focus-visible {
 .member-pick.is-required { cursor: default; }
 
 @media (max-width: 640px) {
-  .agent-picker-modal { width: 92vw; }
+  .agent-picker-modal, .group-members-modal { width: 92vw; }
   .pick-list, .check-grid { grid-template-columns: 1fr; max-height: calc(88vh - 176px); }
+  .group-member-row { gap: 9px; }
+  .group-member-remove { padding: 6px 9px; }
 }
 
 .modal-actions { display: flex; justify-content: space-between; align-items: center; margin-top: 24px; }
@@ -1326,6 +1371,16 @@ input:focus-visible, textarea:focus-visible, select:focus-visible {
 .agent-kb-option b { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--ink); font-size: var(--t-label); font-weight: var(--w-strong); }
 .agent-kb-option i { display: block; margin-top: 2px; color: var(--ink-2); font-size: var(--t-micro); line-height: var(--lh-tight); font-style: normal; font-variant-numeric: tabular-nums; }
 .agent-kb-empty { padding: 15px 12px; border-radius: var(--r-sm); background: var(--surface-2); color: var(--ink-2); font-size: var(--t-label); line-height: var(--lh-label); text-align: center; }
+.tool-config-note { margin: 12px 0 0; color: var(--ink-2); font-size: var(--t-label); line-height: var(--lh-label); }
+.agent-tool-picker { display: grid; gap: 7px; margin-top: 14px; }
+.agent-tool-option { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; align-items: start; gap: 9px; padding: 10px; border: 1px solid var(--line); border-radius: var(--r-sm); background: var(--surface); cursor: pointer; }
+.agent-tool-option:has(input:checked) { border-color: var(--brand); background: var(--brand-soft); }
+.agent-tool-option.baseline { cursor: default; border-style: dashed; }
+.agent-tool-option input { width: auto; margin: 3px 0 0; accent-color: var(--brand); }
+.agent-tool-option > span { min-width: 0; }
+.agent-tool-option b { display: block; color: var(--ink); font-size: var(--t-label); font-weight: var(--w-strong); }
+.agent-tool-option i { display: block; margin-top: 2px; color: var(--ink-2); font-size: var(--t-micro); line-height: var(--lh-tight); font-style: normal; }
+.agent-tool-option em { padding: 2px 6px; border-radius: var(--r-full); background: rgba(255,255,255,.7); color: var(--ink-3); font-size: var(--t-micro); font-style: normal; white-space: nowrap; }
 
 /* ========================================================================== 
    Toast / 重连
@@ -1587,8 +1642,7 @@ body { letter-spacing: -.006em; }
     animation-iteration-count: 1 !important;
     transition-duration: 0.01ms !important;
   }
-  .ci-live, .cm-avatar[data-status="thinking"]::after,
-  .cm-avatar[data-status="speaking"]::after, .chat-status.running::before,
+  .ci-live, .chat-status.running::before,
   .rt-dot, .ts-chip .ts-dot { animation: none !important; opacity: .6; }
 }
 

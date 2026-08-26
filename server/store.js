@@ -7,12 +7,13 @@ const config = require("./config");
 
 function uid(prefix) { return (prefix || "id") + "_" + crypto.randomBytes(8).toString("hex"); }
 
-function newConversation({ title, memberAgentIds = [], memberUserIds = [], kind, config: cfg = {}, ownerId }) {
+function newConversation({ title, memberAgentIds = [], memberUserIds = [], kind, config: cfg = {}, ownerId, systemKey = "" }) {
   const now = Date.now();
   const users = Array.from(new Set([ownerId, ...memberUserIds].filter(Boolean)));
   return {
     id: uid("conv"), ownerId: ownerId || "", title: title || "新的科研讨论",
     kind: kind || (memberAgentIds.length + users.length <= 2 ? "direct" : "group"),
+    systemKey: String(systemKey || ""),
     memberAgentIds: Array.from(new Set(memberAgentIds)), memberUserIds: users,
     messages: [], createdAt: now, updatedAt: now, status: "idle", runningAgentId: null,
     pendingApproval: null, pendingApprovalQueue: [],
@@ -111,23 +112,37 @@ class Store {
       .run(conv.id, userId, lastReadTs);
     return conv;
   }
+  syncSystemConversation(id, { title, memberUserIds } = {}) {
+    const conv = this.conversations.get(id);
+    if (!conv || !conv.systemKey) return null;
+    const nextMembers = Array.from(new Set([conv.ownerId, ...(Array.isArray(memberUserIds) ? memberUserIds : [])].filter(Boolean)));
+    const membersChanged = nextMembers.length !== conv.memberUserIds.length || nextMembers.some((userId, index) => userId !== conv.memberUserIds[index]);
+    const titleChanged = typeof title === "string" && title.trim() && conv.title !== title.trim();
+    if (!membersChanged && !titleChanged) return conv;
+    if (membersChanged) conv.memberUserIds = nextMembers;
+    if (titleChanged) conv.title = title.trim();
+    conv.updatedAt = Date.now();
+    this.persist(conv);
+    this.broadcastConversationUpdate(conv);
+    return conv;
+  }
   deleteConversation(id, ownerId) {
     const conv = this.getConversation(id, ownerId);
-    if (!conv || conv.ownerId !== ownerId) return false;
+    if (!conv || conv.ownerId !== ownerId || conv.systemKey) return false;
     this.broadcastUsers(conv.memberUserIds, { type: "conversation_deleted", conversationId: id });
     this.conversations.delete(id);
     this.db.prepare("DELETE FROM conversations WHERE id = ? AND owner_id = ?").run(id, conv.ownerId);
     this.db.prepare("DELETE FROM conversation_reads WHERE conversation_id = ?").run(id);
     this.broadcast(id, { type: "conversation_deleted", conversationId: id });
     const clients = this.sseClients.get(id);
-    if (clients) clients.forEach((c) => { try { c.end(); } catch (_) {} });
+    if (clients) clients.forEach((client) => { try { client.res.end(); } catch (_) {} });
     this.sseClients.delete(id); this.pendingRuns.delete(id); this.runningLocks.delete(id); this.approvalResolvers.delete(id);
     return true;
   }
   updateConversationConfig(id, patch, ownerId) {
     const conv = this.getConversation(id, ownerId);
     if (!conv) return null;
-    if (patch && typeof patch.title === "string" && patch.title.trim()) conv.title = patch.title.trim();
+    if (!conv.systemKey && patch && typeof patch.title === "string" && patch.title.trim()) conv.title = patch.title.trim();
     if (patch && Array.isArray(patch.kbIds)) conv.config = Object.assign({}, conv.config, { kbIds: patch.kbIds });
     if (patch && patch.config && typeof patch.config === "object") conv.config = Object.assign({}, conv.config, patch.config);
     conv.updatedAt = Date.now();
@@ -135,10 +150,45 @@ class Store {
     this.broadcastConversationUpdate(conv);
     return conv;
   }
-  addClient(convId, res) {
+  updateConversationMembers(id, memberUserIds) {
+    const conv = this.conversations.get(id);
+    if (!conv) return null;
+    const previousMembers = Array.from(new Set(conv.memberUserIds || []));
+    const nextMembers = Array.from(new Set([conv.ownerId, ...(memberUserIds || [])].filter(Boolean)));
+    if (previousMembers.length === nextMembers.length && previousMembers.every((userId, index) => userId === nextMembers[index])) return conv;
+    conv.memberUserIds = nextMembers;
+    conv.updatedAt = Date.now();
+    this.persist(conv);
+    this.broadcastUsers([...previousMembers, ...nextMembers], {
+      type: "conversation_members_updated", conversationId: conv.id, updatedAt: conv.updatedAt,
+    });
+    previousMembers.filter((userId) => !nextMembers.includes(userId)).forEach((userId) => this.closeConversationClients(conv.id, userId));
+    return conv;
+  }
+  addConversationMember(id, userId) {
+    const conv = this.conversations.get(id);
+    if (!conv || conv.memberUserIds.includes(userId)) return null;
+    return this.updateConversationMembers(id, [...conv.memberUserIds, userId]);
+  }
+  removeConversationMember(id, userId) {
+    const conv = this.conversations.get(id);
+    if (!conv || conv.ownerId === userId || !conv.memberUserIds.includes(userId)) return null;
+    return this.updateConversationMembers(id, conv.memberUserIds.filter((memberId) => memberId !== userId));
+  }
+  addClient(convId, userId, res) {
     if (!this.sseClients.has(convId)) this.sseClients.set(convId, new Set());
-    this.sseClients.get(convId).add(res);
-    res.on("close", () => { const set = this.sseClients.get(convId); if (set) set.delete(res); });
+    const client = { userId, res };
+    this.sseClients.get(convId).add(client);
+    res.on("close", () => { const set = this.sseClients.get(convId); if (set) set.delete(client); });
+  }
+  closeConversationClients(convId, userId) {
+    const set = this.sseClients.get(convId);
+    if (!set) return;
+    Array.from(set).filter((client) => client.userId === userId).forEach((client) => {
+      set.delete(client);
+      try { client.res.end(); } catch (_) {}
+    });
+    if (!set.size) this.sseClients.delete(convId);
   }
   addUserClient(userId, res) {
     if (!this.userSseClients.has(userId)) this.userSseClients.set(userId, new Set());
@@ -152,8 +202,13 @@ class Store {
   }
   broadcast(convId, event) {
     const set = this.sseClients.get(convId); if (!set) return;
+    const conv = this.conversations.get(convId);
+    const members = new Set(conv ? conv.memberUserIds : []);
     const payload = `data: ${JSON.stringify(event)}\n\n`;
-    set.forEach((res) => { try { res.write(payload); } catch (_) {} });
+    set.forEach((client) => {
+      if (!members.has(client.userId)) return;
+      try { client.res.write(payload); } catch (_) {}
+    });
   }
   broadcastUsers(userIds, event) {
     const payload = `data: ${JSON.stringify(event)}\n\n`;

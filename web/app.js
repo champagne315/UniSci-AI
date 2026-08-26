@@ -25,15 +25,17 @@ const state = {
   user: null,
   theme: "station",
   view: "chat",
-  agents: [], convs: [], currentConv: null, kbs: [], friends: [],
+  agents: [], skills: [], convs: [], currentConv: null, kbs: [], friends: [], toolCatalog: [],
   streaming: {}, evtSource: null, globalEvtSource: null, conversationRefreshTimer: null,
   lastSpeakerName: null,
   memberStatus: {}, stick: true,
   reconnectTries: 0, reconnectTimer: null, maxReconnectTries: 10,
   convQuery: "", convKind: "all", convDeleting: null,
   agentQuery: "", agentCat: "全部",
+  skillQuery: "", skillCat: "全部",
   kbQuery: "", kbDeleting: null, currentKb: null, rag: null,
   wizard: { step: 0, title: "", memberIds: [], memberUserIds: [] },
+  groupMembers: null,
 };
 
 const $ = (id) => document.getElementById(id);
@@ -619,20 +621,35 @@ function setupAuth() {
   $("logoutBtn").onclick = async () => { await api.post("/api/auth/logout"); forceCloseSettings(); closeModal($("settingsModal")); showAuthGate(); };
   renderAuthMode();
 }
+function ensureAppEventsBound() {
+  if (appBound) return;
+  bindEvents();
+  appBound = true;
+}
+
 async function bootWorkspace() {
+  ensureAppEventsBound();
   try { const h = await api.get("/api/health"); state.rag = h.rag || null; } catch (_) {}
   try { const f = await api.get("/api/friends"); state.friends = f.friends || []; } catch (_) { state.friends = []; }
-  const [a] = await Promise.all([api.get("/api/agents"), loadKbs(), loadConvs()]);
-  state.agents = a.agents;
-  renderAgentCats(); renderAgentGrid(); await seedDefaultConversation(); renderChat();
-  if (!appBound) { bindEvents(); appBound = true; }
-  connectGlobalSSE();
+  const [agentsResult, skillsResult, toolsResult, kbsResult, convsResult] = await Promise.allSettled([
+    api.get("/api/agents"), api.get("/api/skills"), api.get("/api/tools"), loadKbs(), loadConvs(),
+  ]);
+  const failed = [agentsResult, skillsResult, toolsResult, kbsResult, convsResult].find((result) => result.status === "rejected");
+  if (agentsResult.status === "fulfilled") state.agents = agentsResult.value.agents || [];
+  if (skillsResult.status === "fulfilled") state.skills = skillsResult.value.skills || [];
+  if (toolsResult.status === "fulfilled") state.toolCatalog = toolsResult.value.tools || [];
+  renderAgentCats(); renderAgentGrid(); renderSkillCats(); renderSkillGrid();
+  if (convsResult.status === "fulfilled") await seedDefaultConversation();
+  renderChat();
+  if (state.user) connectGlobalSSE();
   updateSendBtn();
+  if (failed && state.user) toast("部分工作区数据加载失败，请刷新重试", "err");
 }
 async function init() {
   setupAvatarCropper();
   setupAuth();
   setupOnboarding();
+  ensureAppEventsBound();
   const forceOnboarding = new URLSearchParams(location.search).get("onboarding") === "1";
   try {
     const r = await api.get("/api/auth/me");
@@ -685,15 +702,18 @@ async function seedDefaultConversation() {
    ========================================================================== */
 function switchView(v) {
   if (state.view === "agents" && v !== "agents" && !$("agentConfigView").classList.contains("hidden") && !closeAgentConfig()) return;
+  if (state.view === "skills" && v !== "skills" && !$("skillConfigView").classList.contains("hidden") && !closeSkillConfig()) return;
   state.view = v;
   document.querySelectorAll(".rail-item").forEach((r) => r.classList.toggle("active", r.dataset.view === v));
   $("viewChat").classList.toggle("hidden", v !== "chat");
   $("viewAgents").classList.toggle("hidden", v !== "agents");
+  $("viewSkills").classList.toggle("hidden", v !== "skills");
   $("viewKb").classList.toggle("hidden", v !== "kb");
   $("viewFriends").classList.toggle("hidden", v !== "friends");
   if (v === "friends") openFriendsView();
   if (v === "chat" && state.currentConv) setTimeout(() => $("input").focus(), 40);
   if (v === "agents" && $("agentConfigView").classList.contains("hidden")) setTimeout(() => $("agentSearch").focus(), 40);
+  if (v === "skills" && $("skillConfigView").classList.contains("hidden")) setTimeout(() => $("skillSearch").focus(), 40);
   if (v === "kb") setTimeout(() => $("kbSearch").focus(), 40);
 }
 
@@ -722,7 +742,8 @@ function visibleAgents() {
     if (state.agentCat !== "全部" && (a.category || "通用") !== state.agentCat) return false;
     if (!q) return true;
     const kbNames = (a.kbIds || []).map((id) => (state.kbs.find((kb) => kb.id === id) || {}).name).join(" ");
-    return [a.name, a.mention, a.role, a.description, a.category, (a.skills || []).join(" "), (a.tools || []).join(" "), kbNames]
+    const installedSkillNames = (a.skillIds || []).map((id) => (state.skills.find((skill) => skill.id === id) || {}).name).join(" ");
+    return [a.name, a.mention, a.role, a.description, a.category, (a.skills || []).join(" "), installedSkillNames, (a.tools || []).join(" "), kbNames]
       .some((field) => String(field || "").toLowerCase().includes(q));
   });
 }
@@ -741,14 +762,16 @@ function renderAgentGrid() {
   }
   el.innerHTML = list.map((a) => {
     const color = a.color || "#999999";
+    const installedSkillNames = (a.skillIds || []).map((id) => (state.skills.find((skill) => skill.id === id) || {}).name).filter(Boolean);
     return '<article class="a-card" data-aid="' + a.id + '">' +
       '<div class="ac-top"><div class="ac-avatar" style="background:' + color + "1f;color:" + color + '">' + avatarMarkup(a.avatar) + "</div>" +
       '<div class="ac-body"><div class="ac-name"><span class="ac-name-text">' + esc(a.name) + "</span></div>" +
       '<div class="ac-handle">@' + esc(a.mention || a.name) + " · " + esc(a.category || "通用") + "</div></div></div>" +
       '<div class="ac-desc">' + esc(a.description || a.role || "尚未填写职责简介") + "</div>" +
-      (((a.skills && a.skills.length) || (a.kbIds && a.kbIds.length))
+      (((a.skills && a.skills.length) || installedSkillNames.length || (a.kbIds && a.kbIds.length))
         ? '<div class="ac-skills">' +
-          (a.skills || []).slice(0, 3).map((skill) => '<span class="chip">' + esc(skill) + "</span>").join("") +
+          installedSkillNames.slice(0, 2).map((skill) => '<span class="chip skill-tool-chip">Skill · ' + esc(skill) + "</span>").join("") +
+          (a.skills || []).slice(0, Math.max(0, 3 - installedSkillNames.length)).map((skill) => '<span class="chip">' + esc(skill) + "</span>").join("") +
           ((a.kbIds && a.kbIds.length) ? '<span class="chip kb-chip"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/></svg>' + a.kbIds.length + " 个知识库</span>" : "") +
           "</div>" : "") +
       '<div class="ac-actions"><button class="chat-cta" data-chat="' + a.id + '">发起对话</button>' +
@@ -765,6 +788,151 @@ function renderAgentGrid() {
 }
 
 /* ==========================================================================
+   知识库视图
+   ========================================================================== */
+/* ===========================================================================
+   Skill 市场
+   ========================================================================== */
+let editingSkill = null;
+let skillInitialSnapshot = "";
+let skillSaving = false;
+const SKILL_FIELD_IDS = ["sName", "sCategory", "sDescription", "sKeywords", "sInstructions"];
+
+function visibleSkills() {
+  const query = state.skillQuery.trim().toLowerCase();
+  return state.skills.filter((skill) => {
+    if (state.skillCat !== "全部" && (skill.category || "通用") !== state.skillCat) return false;
+    if (!query) return true;
+    return [skill.name, skill.category, skill.description, skill.instructions, (skill.keywords || []).join(" ")]
+      .some((field) => String(field || "").toLowerCase().includes(query));
+  });
+}
+
+function renderSkillCats() {
+  const cats = ["全部"].concat(Array.from(new Set(state.skills.map((skill) => skill.category || "通用"))));
+  const el = $("skillCats");
+  el.innerHTML = cats.map((category) => '<button class="cat-chip' + (category === state.skillCat ? " active" : "") + '" data-skill-cat="' + esc(category) + '">' + esc(category) + "</button>").join("");
+  el.querySelectorAll("[data-skill-cat]").forEach((button) => {
+    button.onclick = () => { state.skillCat = button.dataset.skillCat; renderSkillCats(); renderSkillGrid(); };
+  });
+}
+
+function renderSkillGrid() {
+  const el = $("skillGrid");
+  const list = visibleSkills();
+  if (!list.length) {
+    el.innerHTML = '<div class="page-empty"><div class="pe-title">' + (state.skillQuery ? "没有匹配的 Skill" : "还没有 Skill") + '</div><div class="pe-hint">' + (state.skillQuery ? "换个关键词试试。" : "创建一个可复用的科研方法与工具能力包。") + "</div></div>";
+    return;
+  }
+  el.innerHTML = list.map((skill) => {
+    const usedBy = state.agents.filter((agent) => (agent.skillIds || []).includes(skill.id)).length;
+    const tools = (skill.toolIds || []).map((id) => (state.toolCatalog.find((tool) => tool.id === id) || {}).label || id);
+    return '<article class="skill-card" data-skill-id="' + esc(skill.id) + '">' +
+      '<div class="skill-card-top"><div class="skill-glyph">✦</div><div><h2>' + esc(skill.name) + '</h2><p>' + esc(skill.category || "通用") + (skill.builtin ? " · 内置" : " · 我的 Skill") + "</p></div></div>" +
+      '<p class="skill-desc">' + esc(skill.description || "尚未填写简介") + "</p>" +
+      '<div class="skill-tags">' + (skill.keywords || []).slice(0, 4).map((keyword) => '<span class="chip">' + esc(keyword) + "</span>").join("") + (tools.length ? '<span class="chip skill-tool-chip">' + esc(tools.length + " 个工具") + "</span>" : "") + "</div>" +
+      '<div class="skill-card-foot"><span>' + usedBy + ' 位 Agent 已安装 · ' + ((skill.resourceFiles || []).length ? (skill.resourceFiles || []).length + ' 个附加文件' : '仅 SKILL.md') + '</span><button class="ac-edit" type="button" data-skill-edit="' + esc(skill.id) + '">配置</button></div></article>';
+  }).join("");
+  el.querySelectorAll("[data-skill-edit]").forEach((button) => { button.onclick = () => openSkillDetail(button.dataset.skillEdit); });
+}
+
+function selectedSkillToolIds() {
+  return Array.from($("sToolPicker").querySelectorAll("input[data-skill-toolid]:checked:not(:disabled)")).map((input) => input.dataset.skillToolid);
+}
+
+function skillDraft() {
+  const name = $("sName").value.trim();
+  return {
+    id: editingSkill ? editingSkill.id : undefined,
+    name,
+    category: $("sCategory").value.trim() || "通用",
+    description: $("sDescription").value.trim(),
+    keywords: parseSkills($("sKeywords").value),
+    instructions: $("sInstructions").value.trim(),
+    toolIds: selectedSkillToolIds().sort(),
+  };
+}
+
+function currentSkillSnapshot() { return JSON.stringify(skillDraft()); }
+function skillHasChanges() { return currentSkillSnapshot() !== skillInitialSnapshot; }
+
+function updateSkillConfigState() {
+  $("sPromptCount").textContent = $("sInstructions").value.trim().length.toLocaleString("zh-CN") + " 字";
+  const name = $("sName").value.trim();
+  const description = $("sDescription").value.trim();
+  $("skillConfigTitle").textContent = editingSkill ? "配置 " + (name || editingSkill.name) : "新建 Skill";
+  const dirty = skillHasChanges();
+  const stateEl = $("sDirtyState");
+  stateEl.classList.toggle("dirty", dirty && !skillSaving); stateEl.classList.toggle("saving", skillSaving);
+  stateEl.textContent = skillSaving ? "正在保存…" : (dirty ? "有未保存的更改" : (editingSkill ? "所有更改已保存" : "填写配置后创建"));
+  $("sCancel").textContent = dirty ? "放弃更改" : "返回列表";
+  $("sSave").disabled = skillSaving || !name || !description;
+}
+
+function renderSkillToolPicker(selectedIds) {
+  const selected = new Set(selectedIds || []);
+  $("sToolPicker").innerHTML = (state.toolCatalog || []).map((tool) => {
+    const checked = tool.default || selected.has(tool.id);
+    const disabled = tool.default ? " disabled" : "";
+    return '<label class="agent-tool-option' + (tool.default ? " baseline" : "") + '"><input type="checkbox" data-skill-toolid="' + esc(tool.id) + '"' + (checked ? " checked" : "") + disabled + ' /><span><b>' + esc(tool.label) + '</b><i>' + esc(tool.description) + '</i></span><em>' + (tool.risk === "write" ? "需审批" : "默认可用") + "</em></label>";
+  }).join("");
+}
+
+function showSkillConfig() {
+  $("skillCatalog").classList.add("hidden"); $("skillConfigView").classList.remove("hidden");
+  $("skillConfigView").querySelector(".agent-config-scroll").scrollTop = 0;
+}
+
+function openSkillDetail(id) {
+  const skill = state.skills.find((item) => item.id === id);
+  if (!skill) return;
+  editingSkill = skill;
+  $("sConfigKicker").textContent = skill.builtin ? "内置 Skill · 保存后创建个人版本" : "我的 Skill";
+  $("sName").value = skill.name; $("sCategory").value = skill.category || ""; $("sDescription").value = skill.description || "";
+  $("sKeywords").value = (skill.keywords || []).join(", "); $("sInstructions").value = skill.instructions || "";
+  $("sDelete").classList.toggle("hidden", !!skill.builtin); renderSkillToolPicker(skill.toolIds || []); showSkillConfig();
+  skillInitialSnapshot = currentSkillSnapshot(); updateSkillConfigState();
+}
+
+function openNewSkill() {
+  editingSkill = null; $("sConfigKicker").textContent = "创建配置";
+  SKILL_FIELD_IDS.forEach((id) => { $(id).value = ""; }); $("sDelete").classList.add("hidden");
+  renderSkillToolPicker([]); showSkillConfig(); skillInitialSnapshot = currentSkillSnapshot(); updateSkillConfigState(); setTimeout(() => $("sName").focus(), 60);
+}
+
+function closeSkillConfig(force = false) {
+  if (!force && skillHasChanges() && !confirm("当前 Skill 尚未保存，确定放弃这些更改吗？")) return false;
+  $("skillConfigView").classList.add("hidden"); $("skillCatalog").classList.remove("hidden"); editingSkill = null; skillInitialSnapshot = "";
+  setTimeout(() => $("skillSearch").focus(), 40); return true;
+}
+
+async function refreshSkills() {
+  const response = await api.get("/api/skills"); state.skills = response.skills || [];
+  if (!state.skills.some((skill) => (skill.category || "通用") === state.skillCat)) state.skillCat = "全部";
+  renderSkillCats(); renderSkillGrid();
+}
+
+async function saveSkill() {
+  const body = skillDraft();
+  if (!body.name || !body.description) {
+    const field = !body.name ? $("sName") : $("sDescription");
+    field.classList.add("invalid"); field.focus();
+    toast(!body.name ? "请先填写 Skill 名称" : "请先填写 Skill 简介", "err"); return;
+  }
+  skillSaving = true; updateSkillConfigState();
+  try { await api.post("/api/skills", body); await refreshSkills(); closeSkillConfig(true); toast(editingSkill && editingSkill.builtin ? "已创建个人 Skill 版本" : "Skill 已保存", "ok"); }
+  catch (error) { toast("保存失败：" + error.message, "err"); }
+  finally { skillSaving = false; if (!$("skillConfigView").classList.contains("hidden")) updateSkillConfigState(); }
+}
+
+async function deleteSkill() {
+  if (!editingSkill || editingSkill.builtin) return;
+  if (!confirm("删除 Skill「" + editingSkill.name + "」？已绑定它的 Agent 不会获得此 Skill 的能力。")) return;
+  try { await api.del("/api/skills/" + editingSkill.id); await refreshSkills(); closeSkillConfig(true); toast("Skill 已删除", "ok"); }
+  catch (error) { toast("删除失败：" + error.message, "err"); }
+}
+
+/* ===========================================================================
    知识库视图
    ========================================================================== */
 async function loadKbs() { const r = await api.get("/api/kbs"); state.kbs = r.kbs || []; renderKbGrid(); }
@@ -1287,6 +1455,140 @@ function renderGroupStep() {
   }; });
 }
 
+function canManageCurrentGroupMembers() {
+  const conv = state.currentConv;
+  return !!(conv && conv.kind === "group" && !conv.systemKey && state.user && conv.ownerId === state.user.id);
+}
+
+function groupMemberRow(member, isOwner, canManage) {
+  const name = member.displayName || member.login || member.id;
+  return '<div class="group-member-row"><span class="group-member-avatar">' + avatarMarkup(member.avatarUrl, presetFor(member.id)) + '</span>' +
+    '<div class="group-member-main"><b>' + esc(name) + '</b><small>' + esc(member.login || member.id) + '</small></div>' +
+    (isOwner ? '<span class="group-owner-badge">群主</span>' : "") +
+    (canManage && !isOwner ? '<button class="danger-btn sm group-member-remove" type="button" data-remove-member="' + esc(member.id) + '">移出</button>' : "") +
+    "</div>";
+}
+
+function groupAgentRow(agent) {
+  return '<div class="group-member-row group-agent-row"><span class="group-member-avatar group-agent-avatar" style="color:' + esc(agent.color || "#5F6D66") + '">' + avatarMarkup(agent.avatar, presetFor(agent.id)) + '</span>' +
+    '<div class="group-member-main"><b>' + esc(agent.name) + '</b><small>智能体 · @' + esc(agent.mention || agent.id) + '</small></div><span class="group-agent-badge">智能体</span></div>';
+}
+
+function renderGroupMembersModal() {
+  const details = state.groupMembers;
+  const conv = state.currentConv;
+  if (!details || !conv || details.conversationId !== conv.id) return;
+  const members = details.members || [];
+  const agents = (conv.memberAgentIds || []).map(agentOf).filter(Boolean);
+  const canManage = canManageCurrentGroupMembers();
+  $("groupMembersSub").textContent = (members.length + agents.length) + " 位成员 · " + members.length + " 位用户" + (agents.length ? " · " + agents.length + " 个智能体" : "");
+  $("groupMembersList").innerHTML = members.map((member) => groupMemberRow(member, member.id === details.ownerId, canManage)).join("") +
+    (agents.length ? '<div class="group-member-divider">智能体成员</div>' + agents.map(groupAgentRow).join("") : "");
+  const inviteSection = $("groupInviteSection");
+  const permissionHint = $("groupMemberPermissionHint");
+  inviteSection.classList.toggle("hidden", !canManage);
+  permissionHint.classList.toggle("hidden", canManage);
+  if (!canManage) {
+    permissionHint.textContent = conv.systemKey
+      ? "这是系统全员群，成员由系统自动同步，暂不支持手动邀请。"
+      : "仅群主可以邀请好友或管理群成员。";
+    $("groupInviteList").innerHTML = "";
+  } else {
+    const currentIds = new Set(members.map((member) => member.id));
+    const candidates = acceptedFriends().filter((friend) => friend.user && !currentIds.has(friend.user.id));
+    $("groupInviteList").innerHTML = candidates.length ? candidates.map((friend) =>
+      '<label class="agent-option-card member-pick"><input type="checkbox" data-invite-user="' + esc(friend.user.id) + '"/><span class="agent-option-main"><span class="agent-option-name">' + friendLabel(friend) + '</span><span class="agent-option-role">好友 · ' + esc(friend.user.id) + '</span></span></label>'
+    ).join("") : '<div class="group-invite-empty">暂无可邀请好友，请先在“好友”中添加并通过好友申请。</div>';
+  }
+  $("groupMembersList").querySelectorAll("[data-remove-member]").forEach((button) => {
+    button.onclick = () => removeGroupMember(button.dataset.removeMember);
+  });
+}
+
+async function openGroupMembersModal({ focusInvite = false } = {}) {
+  const conv = state.currentConv;
+  if (!conv || conv.kind !== "group") return;
+  try {
+    const [details] = await Promise.all([
+      api.get("/api/conversations/" + conv.id + "/members"),
+      loadFriends(),
+    ]);
+    state.groupMembers = details;
+    renderGroupMembersModal();
+    openModal($("groupMembersModal"));
+    if (focusInvite && canManageCurrentGroupMembers()) {
+      const section = $("groupInviteSection");
+      section.scrollIntoView({ block: "nearest" });
+      const firstCandidate = section.querySelector("input[data-invite-user]");
+      setTimeout(() => (firstCandidate || $("groupInviteSubmit")).focus(), 40);
+    }
+  } catch (error) { toast("读取群成员失败：" + error.message, "err"); }
+}
+
+function openGroupInvite() {
+  if (!canManageCurrentGroupMembers()) return;
+  openGroupMembersModal({ focusInvite: true });
+}
+
+async function refreshGroupMembersModal() {
+  const conv = state.currentConv;
+  if (!conv || !$("groupMembersModal") || $("groupMembersModal").classList.contains("hidden")) return;
+  const details = await api.get("/api/conversations/" + conv.id + "/members");
+  state.groupMembers = details;
+  renderGroupMembersModal();
+}
+
+async function refreshCurrentConversationMembers() {
+  const conv = state.currentConv;
+  if (!conv) return false;
+  try {
+    const response = await api.get("/api/conversations/" + conv.id);
+    state.currentConv = response.conversation;
+    renderChatHeader();
+    renderQuickMentions();
+    return true;
+  } catch (error) {
+    disconnectSSE();
+    state.currentConv = null;
+    state.groupMembers = null;
+    state.streaming = {};
+    $("viewChat").classList.remove("on-conv");
+    closeModal($("groupMembersModal"));
+    renderChat();
+    updateSendBtn();
+    toast("你已被移出该群聊", "err");
+    return false;
+  }
+}
+
+async function inviteSelectedGroupMembers() {
+  const conv = state.currentConv;
+  const selected = Array.from($("groupInviteList").querySelectorAll("input[data-invite-user]:checked")).map((input) => input.dataset.inviteUser);
+  if (!conv || !selected.length) { toast("请选择要邀请的好友"); return; }
+  const submit = $("groupInviteSubmit");
+  submit.disabled = true;
+  try {
+    for (const userId of selected) await api.post("/api/conversations/" + conv.id + "/members", { userId });
+    await Promise.all([loadConvs(), refreshCurrentConversationMembers()]);
+    await refreshGroupMembersModal();
+    toast("已邀请 " + selected.length + " 位好友", "ok");
+  } catch (error) { toast("邀请失败：" + error.message, "err"); }
+  finally { submit.disabled = false; }
+}
+
+async function removeGroupMember(userId) {
+  const conv = state.currentConv;
+  const member = state.groupMembers && (state.groupMembers.members || []).find((item) => item.id === userId);
+  const name = member && (member.displayName || member.login || member.id);
+  if (!conv || !userId || !confirm("确定将“" + (name || userId) + "”移出群聊吗？")) return;
+  try {
+    await api.del("/api/conversations/" + conv.id + "/members/" + encodeURIComponent(userId));
+    await Promise.all([loadConvs(), refreshCurrentConversationMembers()]);
+    await refreshGroupMembersModal();
+    toast("已将成员移出群聊", "ok");
+  } catch (error) { toast("移出失败：" + error.message, "err"); }
+}
+
 async function groupNext() {
   const s = state.wizard.step;
   if (s === 0) {
@@ -1342,6 +1644,15 @@ function scheduleConversationRefresh() {
 
 function onGlobalEvent(event) {
   if (!event || !state.user) return;
+  if (event.type === "conversation_members_updated") {
+    scheduleConversationRefresh();
+    if (state.currentConv && state.currentConv.id === event.conversationId) {
+      refreshCurrentConversationMembers().then((stillMember) => {
+        if (stillMember) refreshGroupMembersModal().catch((error) => console.warn("[members] 面板刷新失败", error));
+      }).catch((error) => console.warn("[members] 会话刷新失败", error));
+    }
+    return;
+  }
   if (event.type === "conversation_updated" || event.type === "conversation_deleted") { scheduleConversationRefresh(); return; }
   if (event.type === "profile_updated" && event.user && event.user.id) {
     if (event.user.id === state.user.id) state.user = event.user;
@@ -1514,8 +1825,10 @@ function renderChatHeader() {
   const conv = state.currentConv;
   const avEl = $("chatAvatar");
   const titleEl = $("chatTitle");
-  const membersEl = $("chatMembers");
-  membersEl.innerHTML = "";
+  const groupMembersBtn = $("groupMembersBtn");
+  const groupInviteBtn = $("groupInviteBtn");
+  groupMembersBtn.classList.toggle("hidden", !conv || conv.kind !== "group");
+  groupInviteBtn.classList.toggle("hidden", !canManageCurrentGroupMembers());
 
   if (!conv) {
     avEl.className = "ch-avatar ch-avatar-empty";
@@ -1535,27 +1848,6 @@ function renderChatHeader() {
     titleEl.innerHTML = '<span class="ch-title-text">' + esc(conv.title) + "</span>";
     const humanCount = (conv.memberUserIds || [state.user && state.user.id]).length;
     $("chatSub").textContent = (members.length + humanCount) + " 位成员（" + humanCount + " 位用户 · " + members.length + " 个智能体） · " + (conv.messages ? conv.messages.length : 0) + " 条消息";
-    for (const a of members) {
-      const d = document.createElement("div");
-      d.className = "cm-avatar";
-      d.dataset.agentId = a.id;
-      d.dataset.status = state.memberStatus[a.id] || "idle";
-      d.title = a.name + " @" + a.mention + (a.role ? " · " + a.role : "") + "（点击 @ 他）";
-      d.style.background = (a.color || "#999") + "1f";
-      d.style.color = a.color || "#999";
-      d.innerHTML = avatarMarkup(a.avatar, presetFor(a.id));
-      d.onclick = () => insertMention(a);
-      membersEl.appendChild(d);
-    }
-    for (const person of (conv.memberUserIds || []).filter((id) => !state.user || id !== state.user.id).map(humanMember)) {
-      const d = document.createElement("div");
-      d.className = "cm-avatar";
-      d.title = person.name;
-      d.style.background = person.color + "1f";
-      d.style.color = person.color;
-      d.innerHTML = avatarMarkup(person.avatar, presetFor(person.id));
-      membersEl.appendChild(d);
-    }
   } else {
     const a = members[0] || {};
     const isHumanDirect = !(conv.memberAgentIds || []).length;
@@ -1656,8 +1948,6 @@ function toggleKbPop() {
 
 function setMemberStatus(agentId, status) {
   state.memberStatus[agentId] = status;
-  const av = document.querySelector('#chatMembers .cm-avatar[data-agent-id="' + agentId + '"]');
-  if (av) av.dataset.status = status;
 }
 
 function renderTypingStrip() {
@@ -1680,12 +1970,11 @@ function getHandoffSource(msg) {
   if (idx < 1) return null;
   const agent = agentOf(msg.author);
   if (!agent) return null;
-  const myMention = (agent.mention || agent.id).toLowerCase();
   for (let i = idx - 1; i >= 0; i--) {
     const prev = conv.messages[i];
     if (prev.authorType !== "agent") continue;
     if (prev.author === msg.author) continue;
-    if ((prev.mentions || []).map((m) => m.toLowerCase()).includes(myMention)) return prev.authorName || prev.author;
+    if (((prev.meta && prev.meta.handoffTargetIds) || []).includes(agent.id)) return prev.authorName || prev.author;
     break;
   }
   return null;
@@ -1724,12 +2013,21 @@ function msgShell(o) {
   return el;
 }
 
+function toolCallHTML(call) {
+  const status = call.status || "completed";
+  const labels = { completed: "已完成", failed: "失败", waiting_approval: "等待授权", rejected: "已拒绝" };
+  const catalog = (state.toolCatalog || []).find((tool) => tool.id === call.name);
+  const title = (catalog && catalog.label) || call.name || "工具调用";
+  return '<details class="tool-call ' + esc(status) + '"' + (status === "waiting_approval" ? " open" : "") + '><summary><span class="tool-dot"></span><b>' + esc(title) + '</b><em>' + esc(labels[status] || status) + '</em></summary><div class="tool-call-body"><code>' + esc(JSON.stringify(call.args || {}, null, 2)) + '</code>' + (call.summary ? '<p>' + esc(call.summary) + '</p>' : "") + '</div></details>';
+}
+
 function bubbleHTML(msg) {
   let html = "";
   if (msg.reasoning) html += '<details class="reasoning"><summary>思考过程</summary><div class="reasoning-body">' + esc(msg.reasoning) + "</div></details>";
+  if (msg.meta && msg.meta.toolCalls && msg.meta.toolCalls.length) html += '<div class="tool-trace">' + msg.meta.toolCalls.map(toolCallHTML).join("") + "</div>";
   html += '<div class="bubble">' + md(msg.content) + "</div>";
   if (msg.meta && msg.meta.kbHits && msg.meta.kbHits.length) {
-    html += '<div class="msg-foot"><span class="kb-ref">📎 引用 ' + msg.meta.kbHits.length + " 条知识库</span></div>";
+    html += '<div class="msg-foot"><span class="kb-ref">引用 ' + msg.meta.kbHits.length + " 条知识库</span></div>";
   }
   return html;
 }
@@ -1834,6 +2132,10 @@ function onEvent(j) {
     case "agent_start": startAgentStream(j); setStatus("running"); break;
     case "agent_token": appendAgentToken(j.agentId, j.token); break;
     case "agent_reasoning": appendAgentReasoning(j.agentId, j.token); break;
+    case "tool_call_started": appendToolProgress(j.agentId, j.toolCall, "running", j.result); break;
+    case "tool_call_completed": appendToolProgress(j.agentId, j.toolCall, "completed", j.result); break;
+    case "tool_call_failed": appendToolProgress(j.agentId, j.toolCall, "failed", j.result); break;
+    case "tool_call_waiting_approval": appendToolProgress(j.agentId, j.toolCall, "waiting_approval", j.approval); break;
     case "agent_end": endAgentStream(j); break;
     case "approval_request":
       conv.pendingApproval = j.approval;
@@ -1890,6 +2192,25 @@ function appendAgentToken(agentId, token) {
   }
   s.text += token;
   s.textEl.innerHTML = md(s.text);
+  scrollFeed();
+}
+
+function appendToolProgress(agentId, toolCall, status, result) {
+  const s = state.streaming[agentId];
+  if (!s || !s.bubble || !toolCall) return;
+  const trace = s.bubble.parentElement.querySelector(".stream-tool-trace") || document.createElement("div");
+  if (!trace.classList.contains("stream-tool-trace")) {
+    trace.className = "tool-trace stream-tool-trace";
+    s.bubble.parentElement.insertBefore(trace, s.bubble);
+  }
+  const key = toolCall.id || toolCall.name;
+  let item = trace.querySelector('[data-tool-call-id="' + CSS.escape(key) + '"]');
+  if (!item) { item = document.createElement("div"); item.className = "tool-live"; item.dataset.toolCallId = key; trace.appendChild(item); }
+  const catalog = (state.toolCatalog || []).find((tool) => tool.id === toolCall.name);
+  const label = (catalog && catalog.label) || toolCall.name;
+  const statusText = { running: "执行中", completed: "已完成", failed: "失败", waiting_approval: "等待授权" }[status] || status;
+  item.className = "tool-live " + status;
+  item.innerHTML = '<span class="tool-dot"></span><b>' + esc(label) + '</b><em>' + esc(statusText) + '</em>' + (result && result.summary ? '<small>' + esc(result.summary) + '</small>' : "");
   scrollFeed();
 }
 
@@ -1981,6 +2302,14 @@ function selectedAgentKbIds() {
   return Array.from($("aKbPicker").querySelectorAll("input[data-kbid]:checked")).map((input) => input.dataset.kbid);
 }
 
+function selectedAgentToolIds() {
+  return Array.from($("aToolPicker").querySelectorAll("input[data-toolid]:checked")).map((input) => input.dataset.toolid);
+}
+
+function selectedAgentSkillIds() {
+  return Array.from($("aSkillPicker").querySelectorAll("input[data-skillid]:checked")).map((input) => input.dataset.skillid);
+}
+
 function agentDraft() {
   const name = $("aName").value.trim();
   return {
@@ -1995,6 +2324,8 @@ function agentDraft() {
     systemPrompt: $("aPrompt").value.trim(),
     skills: parseSkills($("aSkills").value),
     tools: editingAgent ? (editingAgent.tools || []) : [],
+    toolIds: selectedAgentToolIds().sort(),
+    skillIds: selectedAgentSkillIds().sort(),
     kbIds: selectedAgentKbIds().sort(),
     mcp: editingAgent ? (editingAgent.mcp || []) : [],
     permissions: editingAgent ? (editingAgent.permissions || {}) : {},
@@ -2012,6 +2343,11 @@ function agentHasChanges() {
 function updateAgentKbCount() {
   const count = selectedAgentKbIds().length;
   $("aKbCount").textContent = count ? count + " 个已选择" : "继承会话";
+}
+
+function updateAgentSkillCount() {
+  const count = selectedAgentSkillIds().length;
+  $("aSkillCount").textContent = count ? "已安装 " + count + " 个" : "未安装";
 }
 
 function renderAvatarOptions() {
@@ -2040,6 +2376,7 @@ function updateAgentConfigSummary() {
 
 function refreshAgentConfigState() {
   updateAgentKbCount();
+  updateAgentSkillCount();
   updateAgentConfigSummary();
   const dirty = agentHasChanges();
   const stateEl = $("aDirtyState");
@@ -2050,6 +2387,32 @@ function refreshAgentConfigState() {
   const hasName = Boolean($("aName").value.trim());
   $("aCancel").textContent = dirty ? "放弃更改" : "返回列表";
   $("aSave").disabled = agentSaving || !hasName;
+}
+
+function renderAgentSkillPicker(selectedIds) {
+  const selected = new Set(selectedIds || []);
+  const picker = $("aSkillPicker");
+  if (!state.skills.length) {
+    picker.innerHTML = '<div class="agent-kb-empty">暂无可用 Skill。前往「Skill 市场」创建或管理能力包。</div>';
+    updateAgentSkillCount();
+    return;
+  }
+  picker.innerHTML = state.skills.map((skill) => '<label class="agent-tool-option"><input type="checkbox" data-skillid="' + esc(skill.id) + '"' + (selected.has(skill.id) ? " checked" : "") + ' /><span><b>' + esc(skill.name) + '</b><i>' + esc(skill.description || "未填写简介") + '</i></span><em>' + esc(skill.category || "通用") + '</em></label>').join("");
+  picker.querySelectorAll("input[data-skillid]").forEach((input) => { input.onchange = refreshAgentConfigState; });
+  updateAgentSkillCount();
+}
+
+function renderAgentToolPicker(selectedIds) {
+  const selected = new Set(selectedIds || []);
+  const picker = $("aToolPicker");
+  const tools = state.toolCatalog || [];
+  picker.innerHTML = tools.map((tool) => {
+    const checked = tool.default || selected.has(tool.id);
+    const locked = tool.default ? " checked disabled" : (checked ? " checked" : "");
+    const badge = tool.risk === "write" ? "需审批" : (tool.default ? "默认可用" : "显式授权");
+    return '<label class="agent-tool-option' + (tool.default ? " baseline" : "") + '"><input type="checkbox" data-toolid="' + esc(tool.id) + '"' + locked + ' /><span><b>' + esc(tool.label) + '</b><i>' + esc(tool.description) + '</i></span><em>' + badge + '</em></label>';
+  }).join("") || '<div class="agent-kb-empty">工具目录加载失败，请刷新后重试。</div>';
+  picker.querySelectorAll("input[data-toolid]").forEach((input) => { input.onchange = refreshAgentConfigState; });
 }
 
 function renderAgentKbPicker(selectedIds) {
@@ -2095,6 +2458,8 @@ function openAgentDetail(id) {
   $("aPrompt").value = agent.systemPrompt || "";
   renderAvatarOptions();
   renderAgentKbPicker(agent.kbIds || []);
+  renderAgentSkillPicker(agent.skillIds || []);
+  renderAgentToolPicker(agent.toolIds || []);
   prepareAgentConfig(agent);
   agentInitialSnapshot = currentAgentSnapshot();
   refreshAgentConfigState();
@@ -2108,6 +2473,8 @@ function openNewAgent() {
   $("aAvatarUploadStatus").textContent = "未上传";
   renderAvatarOptions();
   renderAgentKbPicker([]);
+  renderAgentSkillPicker([]);
+  renderAgentToolPicker([]);
   prepareAgentConfig(null);
   agentInitialSnapshot = currentAgentSnapshot();
   refreshAgentConfigState();
@@ -2141,7 +2508,7 @@ async function saveAgent() {
     const response = await api.get("/api/agents");
     state.agents = response.agents;
     if (!state.agents.some((agent) => (agent.category || "通用") === state.agentCat)) state.agentCat = "全部";
-    renderAgentCats(); renderAgentGrid(); renderChatHeader(); renderQuickMentions(); renderConvSwitch();
+    renderAgentCats(); renderAgentGrid(); renderSkillGrid(); renderChatHeader(); renderQuickMentions(); renderConvSwitch();
     closeAgentConfig(true);
     toast(body.id && editingAgent && editingAgent.builtin ? "已更新我的智能体" : "智能体配置已保存", "ok");
   } catch (error) {
@@ -2160,7 +2527,7 @@ async function deleteAgent() {
     const response = await api.get("/api/agents");
     state.agents = response.agents;
     if (!state.agents.some((agent) => (agent.category || "通用") === state.agentCat)) state.agentCat = "全部";
-    renderAgentCats(); renderAgentGrid(); renderConvSwitch();
+    renderAgentCats(); renderAgentGrid(); renderSkillGrid(); renderConvSwitch();
     closeAgentConfig(true);
     toast("智能体已删除", "ok");
   } catch (error) {
@@ -2346,8 +2713,20 @@ function bindEvents() {
       input.value = "";
     }
   });
+  // Skill 市场
+  $("skillSearch").addEventListener("input", (event) => { state.skillQuery = event.target.value; renderSkillGrid(); });
+  $("newSkillBtn").onclick = openNewSkill;
+  $("sSave").onclick = saveSkill;
+  $("sBack").onclick = () => closeSkillConfig();
+  $("sCancel").onclick = () => closeSkillConfig();
+  $("sDelete").onclick = deleteSkill;
+  SKILL_FIELD_IDS.forEach((id) => {
+    $(id).addEventListener("input", () => { if (id === "sName" || id === "sDescription") $(id).classList.remove("invalid"); updateSkillConfigState(); });
+  });
+  $("sToolPicker").addEventListener("change", updateSkillConfigState);
+
   window.addEventListener("beforeunload", (event) => {
-    if (!$("agentConfigView").classList.contains("hidden") && agentHasChanges()) {
+    if ((!$("agentConfigView").classList.contains("hidden") && agentHasChanges()) || (!$("skillConfigView").classList.contains("hidden") && skillHasChanges())) {
       event.preventDefault();
       event.returnValue = "";
     }
@@ -2392,6 +2771,10 @@ function bindEvents() {
   $("groupNext").onclick = groupNext;
   $("groupPrev").onclick = () => { if (state.wizard.step > 0) { state.wizard.step--; renderGroupStep(); } };
   $("groupCancel").onclick = () => closeModal($("groupModal"));
+  $("groupInviteBtn").onclick = openGroupInvite;
+  $("groupMembersBtn").onclick = openGroupMembersModal;
+  $("groupMembersClose").onclick = () => closeModal($("groupMembersModal"));
+  $("groupInviteSubmit").onclick = inviteSelectedGroupMembers;
 
   // 审批
   $("gaApprove").onclick = () => decideApproval(true, $("approvalBar").dataset.approvalId);

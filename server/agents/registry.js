@@ -37,6 +37,8 @@ class Registry {
       description: raw.description || raw.role || "", category: raw.category || "通用",
       avatar: raw.avatar || "🤖", color: raw.color || "#475569",
       systemPrompt: raw.systemPrompt || `你是${raw.name}。`, skills: raw.skills || [], tools: raw.tools || [],
+      toolIds: Array.isArray(raw.toolIds) ? raw.toolIds.filter((item) => typeof item === "string") : [],
+      skillIds: Array.isArray(raw.skillIds) ? raw.skillIds.filter((item) => typeof item === "string") : [],
       mcp: raw.mcp || [], kbIds: raw.kbIds || [], permissions: raw.permissions || {}, builtin: !isCustom,
     };
   }

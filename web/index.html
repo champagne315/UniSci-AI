@@ -126,6 +126,10 @@
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="8" width="16" height="12" rx="3"/><path d="M12 8V4M8 3h8"/><circle cx="9" cy="14" r="1.2" fill="currentColor" stroke="none"/><circle cx="15" cy="14" r="1.2" fill="currentColor" stroke="none"/></svg>
           <span>科研市场</span>
         </button>
+        <button class="rail-item" data-view="skills" title="Skill 市场">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3.5l2.1 5.4 5.4 2.1-5.4 2.1-2.1 5.4-2.1-5.4-5.4-2.1 5.4-2.1L12 3.5z"/><path d="M19 16l.9 2.1L22 19l-2.1.9L19 22l-.9-2.1L16 19l2.1-.9L19 16z"/></svg>
+          <span>Skill 市场</span>
+        </button>
         <button class="rail-item" data-view="kb" title="知识库">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/></svg>
           <span>知识库</span>
@@ -182,7 +186,13 @@
             <div class="chat-sub" id="chatSub">或从「科研市场」里挑一位开始单聊</div>
           </div>
           <div class="ch-right">
-            <div class="ch-members" id="chatMembers"></div>
+            <button class="primary-btn sm group-invite-btn hidden" id="groupInviteBtn" type="button" title="邀请好友加入群聊">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg>
+              邀请好友
+            </button>
+            <button class="icon-btn group-members-btn hidden" id="groupMembersBtn" type="button" title="查看群成员" aria-label="查看群成员">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+            </button>
             <div class="chat-status" id="chatStatus"></div>
           </div>
         </header>
@@ -322,13 +332,95 @@
                 </div>
                 <div class="agent-kb-picker" id="aKbPicker" role="group" aria-label="选择专属知识库"></div>
               </section>
+
+              <section class="config-section" aria-labelledby="skillsTitle">
+                <div class="agent-kb-head compact-section-head">
+                  <h2 id="skillsTitle">已安装 Skills</h2>
+                  <span id="aSkillCount">未安装</span>
+                </div>
+                <p class="tool-config-note">Skill 是独立的科研方法与工具能力包。安装后会影响该智能体的行为指令和可用工具。</p>
+                <div class="agent-tool-picker" id="aSkillPicker" role="group" aria-label="选择智能体 Skills"></div>
+              </section>
+
+              <section class="config-section" aria-labelledby="toolsTitle">
+                <div class="agent-kb-head compact-section-head">
+                  <h2 id="toolsTitle">工具与工作区</h2>
+                  <span>按 Agent 或 Skill 授权</span>
+                </div>
+                <p class="tool-config-note">知识库与公开网络默认可用；工作区仅在此处显式启用，或在任务匹配并读取对应 SKILL.md 后由 Skill 解锁。写入仍需每次批准。</p>
+                <div class="agent-tool-picker" id="aToolPicker" role="group" aria-label="选择智能体工具"></div>
+              </section>
             </main>
           </div>
         </div>
       </section>
     </div>
 
-    <!-- ==================== 视图三：知识库 ==================== -->
+    <!-- ==================== 视图三：Skill 市场 ==================== -->
+    <div class="view view-page hidden" id="viewSkills">
+      <section class="agent-catalog" id="skillCatalog">
+        <header class="page-head agent-page-head">
+          <div class="agent-heading">
+            <div>
+              <h1>Skill 市场</h1>
+              <p>每个 Skill 都以一个独立文件夹保存：SKILL.md 提供元数据与完整工作流，参考 Markdown 或脚本可按需读取。</p>
+            </div>
+            <button class="primary-btn" id="newSkillBtn" type="button">
+              <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>
+              新建 Skill
+            </button>
+          </div>
+          <div class="agent-toolbar">
+            <div class="search-box lg">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><path d="M20.5 20.5l-4.6-4.6"/></svg>
+              <input type="text" id="skillSearch" placeholder="搜索名称、方法或关键词" autocomplete="off" />
+            </div>
+          </div>
+          <div class="cat-bar" id="skillCats" aria-label="Skill 分类"></div>
+        </header>
+        <div class="page-body agent-page-body"><div class="card-grid skill-grid" id="skillGrid"></div></div>
+      </section>
+
+      <section class="agent-config hidden" id="skillConfigView" aria-labelledby="skillConfigTitle">
+        <header class="agent-config-bar">
+          <div class="agent-config-nav">
+            <button class="agent-back" id="sBack" type="button" aria-label="返回 Skill 列表">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M19 12H5M12 19l-7-7 7-7"/></svg>
+            </button>
+            <div><div class="agent-config-kicker" id="sConfigKicker">Skill 配置</div><h1 id="skillConfigTitle">配置 Skill</h1></div>
+          </div>
+          <div class="agent-config-state" id="sDirtyState" aria-live="polite">所有更改已保存</div>
+          <div class="agent-config-actions">
+            <button class="danger-quiet hidden" id="sDelete" type="button">删除</button>
+            <button class="ghost-btn" id="sCancel" type="button">放弃更改</button>
+            <button class="primary-btn" id="sSave" type="button">保存更改</button>
+          </div>
+        </header>
+        <div class="agent-config-scroll"><div class="agent-config-layout"><main class="agent-config-main">
+          <section class="config-section" aria-labelledby="skillIdentityTitle">
+            <div class="config-section-head compact-section-head"><h2 id="skillIdentityTitle">基本信息</h2></div>
+            <div class="identity-grid">
+              <label class="config-field"><span>名称 <b>*</b></span><input id="sName" type="text" maxlength="80" placeholder="例如：系统性文献综述" autocomplete="off" /></label>
+              <label class="config-field"><span>分类</span><input id="sCategory" type="text" maxlength="40" placeholder="科研方法 / 数据方法…" autocomplete="off" /></label>
+              <label class="config-field field-wide"><span>简介 <b>*</b></span><input id="sDescription" type="text" maxlength="400" placeholder="一句话说明该 Skill 解决什么问题" autocomplete="off" /></label>
+              <label class="config-field field-wide"><span>关键词</span><input id="sKeywords" type="text" placeholder="用逗号分隔，如 系统综述, PRISMA, 引用" autocomplete="off" /></label>
+            </div>
+          </section>
+          <section class="config-section" aria-labelledby="skillPromptTitle">
+            <div class="config-section-head compact-section-head"><h2 id="skillPromptTitle">SKILL.md 正文</h2><span class="prompt-count" id="sPromptCount">0 字</span></div>
+            <p class="tool-config-note">正文不会直接塞入 Agent 上下文；Agent 仅在任务相关时读取 SKILL.md，并可继续按需读取同目录的 references/ 或 scripts/ 文件。</p>
+            <label class="config-field"><span class="sr-only">SKILL.md 正文</span><textarea id="sInstructions" rows="11" placeholder="输入完整工作流、方法步骤、证据要求、输出边界与参考资料路径。"></textarea></label>
+          </section>
+          <section class="config-section" aria-labelledby="skillToolsTitle">
+            <div class="agent-kb-head compact-section-head"><h2 id="skillToolsTitle">建议工具</h2><span>受 Agent 权限与审批约束</span></div>
+            <p class="tool-config-note">勾选后，安装此 Skill 的 Agent 将获得对应受控工具；写入工具仍必须通过用户审批。</p>
+            <div class="agent-tool-picker" id="sToolPicker" role="group" aria-label="选择 Skill 工具"></div>
+          </section>
+        </main></div></div>
+      </section>
+    </div>
+
+    <!-- ==================== 视图四：知识库 ==================== -->
     <div class="view view-page hidden" id="viewKb">
       <header class="page-head kb-page-head">
         <div class="agent-heading">
@@ -428,6 +520,22 @@
           <button class="primary-btn sm" id="groupNext">下一步</button>
         </div>
       </div>
+    </div>
+  </div>
+
+  <!-- ===== 模态：群成员 ===== -->
+  <div class="modal hidden" id="groupMembersModal" role="dialog" aria-modal="true" aria-labelledby="groupMembersTitle">
+    <div class="modal-card group-members-modal">
+      <div class="group-members-head">
+        <div><div class="modal-title" id="groupMembersTitle">群成员</div><div class="modal-sub" id="groupMembersSub">正在加载成员…</div></div>
+        <button class="icon-btn" id="groupMembersClose" type="button" aria-label="关闭群成员面板" title="关闭">×</button>
+      </div>
+      <div class="group-members-list" id="groupMembersList"></div>
+      <p class="group-member-permission-hint hidden" id="groupMemberPermissionHint" role="status"></p>
+      <section class="group-invite-section hidden" id="groupInviteSection" aria-labelledby="groupInviteTitle">
+        <div class="group-section-head"><div><b id="groupInviteTitle">邀请好友</b><small>仅群主可邀请已添加的好友</small></div><button class="primary-btn sm" id="groupInviteSubmit" type="button">邀请加入</button></div>
+        <div class="check-grid group-invite-list" id="groupInviteList"></div>
+      </section>
     </div>
   </div>
 

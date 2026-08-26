@@ -18,6 +18,11 @@ const config = {
   avatarUploadDir: path.join(ROOT, "data", "uploads", "avatars"),
   templatesDir: path.join(ROOT, "server", "agents", "builtin"),
   customTemplatesDir: path.join(ROOT, "data", "agents"),
+  skillsDir: path.join(ROOT, "server", "skills", "builtin"),
+  customSkillsDir: path.join(ROOT, "data", "skills"),
+  workspaceDir: process.env.AGENT_WORKSPACE_DIR || path.join(ROOT, "data", "workspaces"),
+  // 所有账户自动获得的 ARC 知识库来源目录；可用环境变量覆盖以适配部署目录。
+  defaultKnowledgeBaseRoot: process.env.DEFAULT_KB_ROOT || path.join(ROOT, "default-knowledge-base"),
 
   // LLM 配置：默认 DeepSeek（真实 API）。无 key 时回退本地 mock 仅用于离线冒烟。
   openaiApiKey: process.env.OPENAI_API_KEY || "",
@@ -47,6 +52,9 @@ const config = {
   // 群聊调度参数
   maxRounds: Number(process.env.MAX_ROUNDS || 8),
   historyWindow: Number(process.env.HISTORY_WINDOW || 12),
+  maxToolSteps: Math.max(1, Math.min(12, Number(process.env.MAX_TOOL_STEPS || 6))),
+  // 可选的 SearXNG/兼容 JSON 搜索端点；未配置时使用 DuckDuckGo HTML 搜索适配器。
+  webSearchEndpoint: String(process.env.WEB_SEARCH_ENDPOINT || "").trim(),
 
   // Mock 流式节奏（毫秒/词）
   mockTypeDelayMs: Number(process.env.MOCK_TYPE_DELAY || 35),

@@ -177,6 +177,9 @@ function orderedPair(left, right) { return left < right ? [left, right] : [right
 function userById(userId) {
   return publicUser(db.prepare("SELECT * FROM users WHERE id = ?").get(String(userId || "").trim()));
 }
+function listUsers() {
+  return db.prepare("SELECT * FROM users ORDER BY created_at ASC").all().map(publicUser);
+}
 function friendshipFor(userId, otherId) {
   const [low, high] = orderedPair(userId, otherId);
   return db.prepare("SELECT * FROM friendships WHERE user_low = ? AND user_high = ?").get(low, high);
@@ -223,4 +226,4 @@ function areFriends(userId, otherId) {
   return !!(friendship && friendship.status === "accepted");
 }
 
-module.exports = { register, login, logout, currentUser, changePassword, updateProfile, hasWelcomed, markWelcomed, validLogin, userById, listFriends, sendFriendRequest, respondFriendRequest, areFriends };
+module.exports = { register, login, logout, currentUser, changePassword, updateProfile, hasWelcomed, markWelcomed, validLogin, userById, listUsers, listFriends, sendFriendRequest, respondFriendRequest, areFriends };

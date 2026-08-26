@@ -715,3 +715,12 @@ body.coboot-skin[data-theme="tactics"] .agent-heading h1::after { background: #f
   body.coboot-skin .theme-grid { grid-template-columns: 1fr; }
   body.coboot-skin .theme-choice { min-height: 98px; }
 }
+
+/* 聊天输入区保持轻量，不再使用包裹整块工具栏的卡片边框。 */
+body.coboot-skin .composer-card,
+body.coboot-skin .composer-card:focus-within {
+  background: transparent;
+  border: 0;
+  border-radius: 0;
+  box-shadow: none;
+}

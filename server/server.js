@@ -11,21 +11,54 @@ const url = require("url");
 const config = require("./config");
 const { Store, appendMessage, uid } = require("./store");
 const { Registry } = require("./agents/registry");
+const { SkillRegistry } = require("./skills/registry");
 const { Orchestrator } = require("./engine/orchestrator");
+const { publicCatalog } = require("./engine/tool-registry");
 const kbStore = require("./kb/storeInstance");
+const defaultKbs = require("./kb/defaults");
 const { ingestFile, ingestText } = require("./kb/ingest");
 const { readJson, parseMultipart, startSSE, sendJSON } = require("./http");
 const auth = require("./auth");
 
 const store = new Store();
 const registry = new Registry();
+const skillRegistry = new SkillRegistry();
 registry.load();
-const orchestrator = new Orchestrator(store, registry);
+skillRegistry.load();
+const orchestrator = new Orchestrator(store, registry, skillRegistry);
 fs.mkdirSync(config.uploadDir, { recursive: true });
 fs.mkdirSync(config.avatarUploadDir, { recursive: true });
 
+// 老用户在服务启动后后台补齐默认 ARC 知识库；不阻塞 HTTP 服务启动。
+defaultKbs.scheduleForUsers(auth.listUsers());
+
 // 科研小助理的新手欢迎语：简洁概括平台与自身定位
-const ASSISTANT_WELCOME = "你好，我是科研小助理，你的入门向导。\n\n这里是 UniSci AI：你可以和不同领域的科研专家单聊，或建群协作；也能把文献、数据上传成知识库，让回答有据可查。\n\n无论你刚有个想法，还是卡在某个环节，先跟我聊聊就好——我会帮你理清问题，再把话题转交给最合适的专家。";
+const ASSISTANT_WELCOME = "你好，我是科研小助理，你的入门向导。\n\n这里是 UniSci AI：你可以和不同领域的科研专家单聊，或建群协作；也能把文献、数据上传成知识库，让回答有据可查。\n\n无论你刚有个想法，还是卡在某个环节，先跟我聊聊就好——我会帮你理清问题，并建议你从科研市场新建对应专家的单聊，或创建群聊后邀请专家协作。";
+const USA_ALL_USERS_GROUP_KEY = "usa_all_users";
+const USA_ALL_USERS_GROUP_TITLE = "USA用户总群";
+
+function ensureUsaAllUsersGroup() {
+  const users = auth.listUsers();
+  if (!users.length) return null;
+  const memberUserIds = users.map((user) => user.id);
+  const group = Array.from(store.conversations.values()).find((conversation) =>
+    conversation.systemKey === USA_ALL_USERS_GROUP_KEY);
+  if (!group) {
+    return store.createConversation({
+      ownerId: memberUserIds[0],
+      title: USA_ALL_USERS_GROUP_TITLE,
+      kind: "group",
+      systemKey: USA_ALL_USERS_GROUP_KEY,
+      memberAgentIds: [],
+      memberUserIds,
+      config: { autoRoute: false, maxRounds: 1, kbIds: [] },
+    });
+  }
+  return store.syncSystemConversation(group.id, {
+    title: USA_ALL_USERS_GROUP_TITLE,
+    memberUserIds,
+  });
+}
 
 // 每个本地账户首个会话固定为科研小助理；后端兜底，避免前端刷新或本地状态影响初始化。
 // 首次进入时由科研小助理发送一条固定欢迎语作为新手引导，且每个用户仅一次。
@@ -115,13 +148,18 @@ async function handleApi(req, res, parsed) {
   if (pathname === "/api/auth/register" && method === "POST") {
     try {
       const body = await readJson(req);
-      return sendJSON(res, 201, { user: auth.register(body.login, body.password, res) });
+      const registeredUser = auth.register(body.login, body.password, res);
+      ensureUsaAllUsersGroup();
+      defaultKbs.scheduleDefaultKnowledgeBases(registeredUser.id);
+      return sendJSON(res, 201, { user: registeredUser });
     } catch (error) { return sendJSON(res, 400, { error: error.message || "注册失败" }); }
   }
   if (pathname === "/api/auth/login" && method === "POST") {
     try {
       const body = await readJson(req);
-      return sendJSON(res, 200, { user: auth.login(body.login, body.password, res) });
+      const user = auth.login(body.login, body.password, res);
+      defaultKbs.scheduleDefaultKnowledgeBases(user.id);
+      return sendJSON(res, 200, { user });
     } catch (error) { return sendJSON(res, 401, { error: error.message || "登录失败" }); }
   }
   if (pathname === "/api/auth/logout" && method === "POST") {
@@ -190,7 +228,30 @@ async function handleApi(req, res, parsed) {
     } catch (error) { return sendJSON(res, 400, { error: error.message || "好友请求处理失败" }); }
   }
 
+  // ---------- Skill 市场 ----------
+  if (pathname === "/api/skills" && method === "GET") {
+    return sendJSON(res, 200, { skills: skillRegistry.all(user.id) });
+  }
+  if (pathname === "/api/skills" && method === "POST") {
+    try {
+      const body = await readJson(req);
+      const permittedTools = new Set(publicCatalog().map((tool) => tool.id));
+      body.toolIds = Array.isArray(body.toolIds) ? Array.from(new Set(body.toolIds.filter((id) => typeof id === "string" && permittedTools.has(id)))) : [];
+      body.keywords = Array.isArray(body.keywords) ? Array.from(new Set(body.keywords.filter((item) => typeof item === "string").map((item) => item.trim()).filter(Boolean))).slice(0, 32) : [];
+      const skill = skillRegistry.saveCustom(body, user.id);
+      return sendJSON(res, 201, { skill });
+    } catch (error) { return sendJSON(res, 400, { error: error.message || "Skill 保存失败" }); }
+  }
+  if (pathname.startsWith("/api/skills/") && method === "DELETE") {
+    const id = pathname.split("/").pop();
+    const ok = skillRegistry.deleteCustom(id, user.id);
+    return sendJSON(res, ok ? 200 : 400, { ok });
+  }
+
   // ---------- Agent 模板 ----------
+  if (pathname === "/api/tools" && method === "GET") {
+    return sendJSON(res, 200, { tools: publicCatalog() });
+  }
   if (pathname === "/api/agents" && method === "GET") {
     return sendJSON(res, 200, { agents: registry.all(user.id) });
   }
@@ -198,6 +259,13 @@ async function handleApi(req, res, parsed) {
     const body = await readJson(req);
     body.kbIds = Array.isArray(body.kbIds)
       ? Array.from(new Set(body.kbIds.filter((id) => typeof id === "string" && kbStore.get(id, user.id))))
+      : undefined;
+    const permittedTools = new Set(publicCatalog().map((tool) => tool.id));
+    body.toolIds = Array.isArray(body.toolIds)
+      ? Array.from(new Set(body.toolIds.filter((id) => typeof id === "string" && permittedTools.has(id))))
+      : undefined;
+    body.skillIds = Array.isArray(body.skillIds)
+      ? Array.from(new Set(body.skillIds.filter((id) => typeof id === "string" && skillRegistry.get(id, user.id))))
       : undefined;
     const tpl = registry.saveCustom(body, user.id);
     return sendJSON(res, 201, { agent: tpl });
@@ -338,6 +406,7 @@ async function handleApi(req, res, parsed) {
 
   // ---------- 会话 ----------
   if (pathname === "/api/conversations" && method === "GET") {
+    ensureUsaAllUsersGroup();
     ensureAssistantConversation(user.id);
     return sendJSON(res, 200, { conversations: store.listConversations(user.id).map((conv) => summarizeConv(conv, user.id)) });
   }
@@ -379,6 +448,42 @@ async function handleApi(req, res, parsed) {
       },
     });
     return sendJSON(res, 201, { conversation: summarizeConv(conv, user.id) });
+  }
+  const membersMatch = pathname.match(/^\/api\/conversations\/([^/]+)\/members$/);
+  if (membersMatch && method === "GET") {
+    const conv = store.getConversation(membersMatch[1], user.id);
+    if (!conv || conv.kind !== "group") return sendJSON(res, 404, { error: "群聊不存在" });
+    return sendJSON(res, 200, {
+      conversationId: conv.id,
+      ownerId: conv.ownerId,
+      members: conv.memberUserIds.map((memberId) => auth.userById(memberId)).filter(Boolean),
+    });
+  }
+  if (membersMatch && method === "POST") {
+    const conv = store.getConversation(membersMatch[1], user.id);
+    if (!conv || conv.kind !== "group") return sendJSON(res, 404, { error: "群聊不存在" });
+    if (conv.systemKey) return sendJSON(res, 403, { error: "系统群不支持调整成员" });
+    if (conv.ownerId !== user.id) return sendJSON(res, 403, { error: "仅群主可以邀请新成员" });
+    const body = await readJson(req);
+    const targetId = String(body.userId || "").trim();
+    const target = auth.userById(targetId);
+    if (!target) return sendJSON(res, 400, { error: "未找到该用户" });
+    if (conv.memberUserIds.includes(target.id)) return sendJSON(res, 400, { error: "该用户已在群聊中" });
+    if (!auth.areFriends(user.id, target.id)) return sendJSON(res, 403, { error: "只能邀请已添加的好友" });
+    const updated = store.addConversationMember(conv.id, target.id);
+    return sendJSON(res, 201, { conversation: summarizeConv(updated, user.id) });
+  }
+  const memberMatch = pathname.match(/^\/api\/conversations\/([^/]+)\/members\/([^/]+)$/);
+  if (memberMatch && method === "DELETE") {
+    const conv = store.getConversation(memberMatch[1], user.id);
+    if (!conv || conv.kind !== "group") return sendJSON(res, 404, { error: "群聊不存在" });
+    if (conv.systemKey) return sendJSON(res, 403, { error: "系统群不支持调整成员" });
+    if (conv.ownerId !== user.id) return sendJSON(res, 403, { error: "仅群主可以移出成员" });
+    const targetId = decodeURIComponent(memberMatch[2]);
+    if (targetId === conv.ownerId) return sendJSON(res, 400, { error: "群主不能被移出群聊" });
+    if (!conv.memberUserIds.includes(targetId)) return sendJSON(res, 404, { error: "该用户不在群聊中" });
+    const updated = store.removeConversationMember(conv.id, targetId);
+    return sendJSON(res, 200, { conversation: summarizeConv(updated, user.id) });
   }
   if (pathname.startsWith("/api/conversations/") && method === "DELETE") {
     const id = pathname.split("/").pop();
@@ -471,7 +576,7 @@ async function handleApi(req, res, parsed) {
     const conv = store.getConversation(sseMatch[1], user.id);
     if (!conv) return sendJSON(res, 404, { error: "会话不存在" });
     startSSE(res);
-    store.addClient(conv.id, res);
+    store.addClient(conv.id, user.id, res);
     // 立即回放当前状态，便于重连
     res.write(`data: ${JSON.stringify({ type: "snapshot", conversationId: conv.id, status: conv.status, pendingApproval: conv.pendingApproval })}\n\n`);
     return true;
@@ -562,6 +667,8 @@ function summarizeConv(conv, userId) {
     id: conv.id,
     title: conv.title,
     kind: conv.kind,
+    ownerId: conv.ownerId,
+    systemKey: conv.systemKey || "",
     memberAgentIds: conv.memberAgentIds,
     memberUserIds: conv.memberUserIds || [conv.ownerId],
     messageCount: conv.messages.length,
@@ -595,6 +702,8 @@ const server = http.createServer(async (req, res) => {
   }
 });
 
+ensureUsaAllUsersGroup();
+
 function tryListen(srv, port, host) {
   return new Promise((resolve, reject) => {
     srv.once("error", (e) => {
@@ -607,7 +716,8 @@ function tryListen(srv, port, host) {
   });
 }
 
-tryListen(server, config.port, config.host).then((actualPort) => {
+const requestedPort = config.port;
+tryListen(server, requestedPort, config.host).then((actualPort) => {
   config.port = actualPort;
   console.log("============================================");
   console.log("  UniSci AI");
@@ -615,7 +725,7 @@ tryListen(server, config.port, config.host).then((actualPort) => {
   console.log(`  模式: ${config.isMock ? "演示模式(本地 mock LLM，免 API Key)" : "实跑模式(OpenAI " + config.model + ")"}`);
   console.log(`  Agent 模板: ${registry.all().length} 个`);
   console.log(`  知识库: ${kbStore.all().length} 个`);
-  console.log(`  地址: http://localhost:${actualPort}` + (actualPort !== Number(process.env.PORT || 3000) ? `  (默认端口被占，已自动切到 ${actualPort})` : ""));
+  console.log(`  地址: http://localhost:${actualPort}` + (actualPort !== requestedPort ? `  (已自动切换到 ${actualPort})` : ""));
   console.log("  按 Ctrl+C 停止");
   console.log("============================================");
 }).catch((e) => {

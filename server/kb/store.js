@@ -7,15 +7,28 @@ const { uid } = require("../store");
 const { embed, cosine } = require("./embed");
 const { semanticEmbedder, cosineDense } = require("./semantic");
 
+const MAP_MARKER = "__unisciMap";
+
 function newKB({ name, description, ownerId }) {
   return { id: uid("kb"), ownerId: ownerId || "", name: name || "未命名知识库", description: description || "", docs: [], createdAt: Date.now() };
+}
+
+function serializeKB(kb) {
+  return JSON.stringify(kb, (_key, value) => value instanceof Map ? { [MAP_MARKER]: Array.from(value.entries()) } : value);
+}
+
+function parseKB(payload) {
+  return JSON.parse(payload, (_key, value) => {
+    if (value && Array.isArray(value[MAP_MARKER])) return new Map(value[MAP_MARKER]);
+    return value;
+  });
 }
 
 class KBStore {
   constructor(options = {}) {
     this.kbs = new Map();
     this.semanticEmbedder = options.semanticEmbedder || semanticEmbedder;
-    this.db = new DatabaseSync(config.databaseFile);
+    this.db = new DatabaseSync(options.databaseFile || config.databaseFile);
     this.db.exec(`
       PRAGMA journal_mode = WAL;
       CREATE TABLE IF NOT EXISTS knowledge_bases (
@@ -27,21 +40,39 @@ class KBStore {
       CREATE INDEX IF NOT EXISTS idx_kbs_owner ON knowledge_bases(owner_id, created_at DESC);
     `);
     for (const row of this.db.prepare("SELECT payload FROM knowledge_bases").all()) {
-      try { this._attach(JSON.parse(row.payload)); } catch (_) { /* 忽略损坏旧记录 */ }
+      try {
+        const { kb, migrated } = this._attach(parseKB(row.payload));
+        if (migrated) this.persist(kb);
+      } catch (_) { /* 忽略损坏旧记录 */ }
     }
   }
   _attach(kb) {
+    let migrated = false;
     kb.docs = Array.isArray(kb.docs) ? kb.docs : [];
+    for (const doc of kb.docs) {
+      doc.chunks = Array.isArray(doc.chunks) ? doc.chunks : [];
+      for (const chunk of doc.chunks) {
+        // 旧版本直接 JSON.stringify(Map) 会得到 {}；基于原文重建词法向量并立即回写。
+        if (!(chunk.vec instanceof Map)) {
+          chunk.vec = embed(chunk.text || "");
+          migrated = true;
+        }
+      }
+    }
     Object.defineProperty(kb, "_store", { value: this, enumerable: false, configurable: true });
-    this.kbs.set(kb.id, kb); return kb;
+    this.kbs.set(kb.id, kb); return { kb, migrated };
   }
   persist(kb) {
     if (!kb || !kb.id || !kb.ownerId) return;
     this.db.prepare(`INSERT INTO knowledge_bases (id, owner_id, created_at, payload) VALUES (?, ?, ?, ?)
       ON CONFLICT(id) DO UPDATE SET owner_id = excluded.owner_id, created_at = excluded.created_at, payload = excluded.payload`)
-      .run(kb.id, kb.ownerId, kb.createdAt || Date.now(), JSON.stringify(kb));
+      .run(kb.id, kb.ownerId, kb.createdAt || Date.now(), serializeKB(kb));
   }
-  create(opts) { const kb = this._attach(newKB(opts)); this.persist(kb); return kb; }
+  create(opts) {
+    const { kb } = this._attach(newKB(opts));
+    this.persist(kb);
+    return kb;
+  }
   get(id, ownerId) { const kb = this.kbs.get(id); return kb && (!ownerId || kb.ownerId === ownerId) ? kb : null; }
   all(ownerId) { return Array.from(this.kbs.values()).filter((kb) => !ownerId || kb.ownerId === ownerId); }
   delete(id, ownerId) {

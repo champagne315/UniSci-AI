@@ -73,9 +73,9 @@ function buildMockReply(agent, conv, ctx) {
   }
   if (skills.length) lines.push(`\n动用 ${skills.join("、")} 推进：拆解边界 → 中间结论 → 指出需配合处。`);
   const others = (members || []).filter((m) => m.id !== agent.id && !lastHumanText.includes("@" + (m.mention || m.id)));
-  if (others.length && Math.random() < 0.5) {
+  if (conv && conv.kind !== "direct" && others.length && Math.random() < 0.5) {
     const t = pick(others);
-    lines.push(`\n需 ${t.name} 配合，@${t.mention || t.id} 你怎么看？`);
+    lines.push(`\n@${t.mention || t.id} 请核查当前结论并补充你的专业意见。`);
   } else if (tools.length && Math.random() < 0.35) {
     lines.push(`\n此处有关键取舍需你拍板。`);
     lines.push(`[NEEDS_APPROVAL: 是否采纳该方案？（批准后继续 ${tools[0]}）]`);
@@ -107,4 +107,40 @@ async function* stream(messages, ctx) {
   }
 }
 
-module.exports = { stream, buildMockReply, getLLM };
+function openAIContent(content) {
+  if (Array.isArray(content)) return content;
+  return String(content == null ? "" : content);
+}
+
+function toOpenAIMessages(messages) {
+  return messages.map((message) => {
+    const item = { role: message.role, content: openAIContent(message.content) };
+    if (message.role === "assistant" && Array.isArray(message.tool_calls) && message.tool_calls.length) item.tool_calls = message.tool_calls;
+    if (message.role === "tool") {
+      item.tool_call_id = message.tool_call_id;
+      if (message.name) item.name = message.name;
+    }
+    return item;
+  });
+}
+
+async function completeWithTools(messages, tools, ctx) {
+  if (config.isMock) {
+    const lastUser = [...messages].reverse().find((message) => message.role === "user");
+    return { content: buildMockReply(ctx.agent, ctx.conv, { lastHumanText: lastUser ? lastUser.content : "", kbHits: ctx.kbHits, members: ctx.members }), tool_calls: [] };
+  }
+  if (!config.openaiApiKey) throw new Error("未配置 OPENAI_API_KEY，无法执行工具调用");
+  const endpoint = config.openaiBaseUrl.replace(/\/$/, "") + "/chat/completions";
+  const response = await fetch(endpoint, {
+    method: "POST",
+    headers: { Authorization: "Bearer " + config.openaiApiKey, "Content-Type": "application/json" },
+    body: JSON.stringify({ model: config.model, messages: toOpenAIMessages(messages), tools: tools || [], tool_choice: "auto", temperature: 0.35, stream: false }),
+  });
+  const body = await response.json().catch(() => ({}));
+  if (!response.ok) throw new Error((body && body.error && body.error.message) || "工具调用模型请求失败（HTTP " + response.status + "）");
+  const message = body && body.choices && body.choices[0] && body.choices[0].message;
+  if (!message) throw new Error("模型没有返回有效消息");
+  return message;
+}
+
+module.exports = { stream, buildMockReply, getLLM, completeWithTools, toOpenAIMessages };

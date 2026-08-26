@@ -6,7 +6,8 @@
 // 这一层对应 TDD 里的"条件边决策函数"，可整体替换为 LLM selector 而不改动引擎主循环。
 
 // 兼容半角 @ 与中文输入法常见的全角 ＠（U+FF20）
-const MENTION_RE = /[@＠]([a-zA-Z0-9_-]+)/g;
+// 用户显式 @ 必须不嵌在邮箱或字母数字标识中，例如 alice@lit 不会路由给 lit。
+const MENTION_RE = /(?:^|[^A-Za-z0-9_.+-])[@＠]([a-zA-Z0-9_-]+)/gm;
 
 function parseMentions(text) {
   if (!text) return [];
@@ -16,6 +17,17 @@ function parseMentions(text) {
     out.push(m[1]);
   }
   // 去重保序
+  return Array.from(new Set(out));
+}
+
+// Agent 之间的转交必须放在独立行行首，例如：\n@lit 请核查引用。
+// 与用户消息不同，Agent 正文中的 @ 可能只是说明、示例或可选建议，不能据此调度。
+const HANDOFF_MENTION_RE = /^(?:@|＠)([a-zA-Z0-9_-]+)(?=\s|$)/gm;
+function parseHandoffMentions(text) {
+  if (!text) return [];
+  const out = [];
+  let m;
+  while ((m = HANDOFF_MENTION_RE.exec(text)) !== null) out.push(m[1]);
   return Array.from(new Set(out));
 }
 
@@ -58,4 +70,4 @@ function autoSelect(text, members) {
   return coord ? [coord] : [members[0]];
 }
 
-module.exports = { parseMentions, resolveExplicit, autoSelect, scoreAgent };
+module.exports = { parseMentions, parseHandoffMentions, resolveExplicit, autoSelect, scoreAgent };
