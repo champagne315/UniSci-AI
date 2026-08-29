@@ -6,7 +6,7 @@ const web = require("./web");
 const { createSkillReader } = require("./skill-reader");
 const readSkill = createSkillReader();
 
-// 工作区不是默认能力：只有用户显式授权，或在读取相关 SKILL.md 后由 Skill 解锁。
+// Skill 只提供指令、资源和可移植的工具声明；实际工具权限始终由 Agent 策略控制。
 const BASELINE_TOOL_IDS = ["knowledge_search", "web_search", "web_fetch"];
 const WRITE_TOOL_IDS = ["workspace_write_file"];
 
@@ -27,17 +27,15 @@ const CATALOG = {
   web_search: { id: "web_search", label: "网络搜索", category: "网络", risk: "network", default: true, description: "搜索公开互联网，返回可继续阅读的网页候选项。", parameters: { type: "object", properties: { query: { type: "string" }, limit: { type: "integer", minimum: 1, maximum: 8 } }, required: ["query"], additionalProperties: false }, execute: web.searchWeb },
   web_fetch: { id: "web_fetch", label: "读取网页", category: "网络", risk: "network", default: true, description: "读取公开网页正文。仅允许公开 HTTP/HTTPS 地址，内网地址会被拒绝。", parameters: { type: "object", properties: { url: { type: "string", format: "uri" } }, required: ["url"], additionalProperties: false }, execute: web.fetchPage },
   workspace_write_file: { id: "workspace_write_file", label: "写入工作区", category: "工作区", risk: "write", default: false, description: "将文本写入用户或会话共享工作区。每次执行都需要用户批准。", parameters: { type: "object", properties: { path: { type: "string", description: "必须以 shared/ 或 user/ 开头" }, content: { type: "string", description: "完整 UTF-8 文本内容" } }, required: ["path", "content"], additionalProperties: false }, execute: (input, ctx) => workspace.writeFile(ctx, input) },
-  skill_read: { id: "skill_read", label: "读取 Skill 文件", category: "Skill", risk: "read", default: false, configurable: false, description: "按需读取当前 Agent 已安装 Skill 的 SKILL.md 正文或其 references/、scripts/ 中的文本文件。读取 SKILL.md 后才会解锁该 Skill 声明的专用工具。", parameters: { type: "object", properties: { skillId: { type: "string", description: "已安装 Skill 的 ID" }, path: { type: "string", description: "可选，相对 Skill 目录的文件路径；省略时读取 SKILL.md 正文" }, startLine: { type: "integer", minimum: 1 }, endLine: { type: "integer", minimum: 1 } }, required: ["skillId"], additionalProperties: false }, execute: readSkill },
+  skill_read: { id: "skill_read", label: "读取 Skill 文件", category: "Skill", risk: "read", default: false, configurable: false, description: "按需读取当前 Agent 已安装 Skill 的 SKILL.md 正文或其 references/、scripts/、assets/ 中的资源。读取 Skill 不会改变 Agent 的工具权限。", parameters: { type: "object", properties: { skillId: { type: "string", description: "已安装 Skill 的 ID" }, path: { type: "string", description: "可选，相对 Skill 目录的文件路径；省略时读取 SKILL.md 正文" }, startLine: { type: "integer", minimum: 1 }, endLine: { type: "integer", minimum: 1 } }, required: ["skillId"], additionalProperties: false }, execute: readSkill },
 };
 
-function normalizeIds(agent, options = {}) {
+function normalizeIds(agent) {
   const configured = Array.isArray(agent.toolIds) ? agent.toolIds : [];
   const legacy = Array.isArray(agent.tools) ? agent.tools : [];
-  const loadedSkillIds = new Set(options.loadedSkillIds || []);
   const installedSkills = Array.isArray(agent.installedSkills) ? agent.installedSkills : [];
-  const skillTools = installedSkills.filter((skill) => loadedSkillIds.has(skill.id)).flatMap((skill) => Array.isArray(skill.toolIds) ? skill.toolIds : []);
   const skillReader = installedSkills.length ? ["skill_read"] : [];
-  return new Set([...BASELINE_TOOL_IDS, ...configured, ...skillReader, ...skillTools, ...legacy.filter((id) => CATALOG[id])]);
+  return new Set([...BASELINE_TOOL_IDS, ...configured, ...skillReader, ...legacy.filter((id) => CATALOG[id])]);
 }
 
 function availableTools(agent, options) {

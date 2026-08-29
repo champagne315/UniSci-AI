@@ -17,7 +17,7 @@ const { publicCatalog } = require("./engine/tool-registry");
 const kbStore = require("./kb/storeInstance");
 const defaultKbs = require("./kb/defaults");
 const { ingestFile, ingestText } = require("./kb/ingest");
-const { readJson, parseMultipart, startSSE, sendJSON } = require("./http");
+const { readBody, readJson, parseMultipart, startSSE, sendJSON } = require("./http");
 const auth = require("./auth");
 
 const store = new Store();
@@ -28,6 +28,7 @@ skillRegistry.load();
 const orchestrator = new Orchestrator(store, registry, skillRegistry);
 fs.mkdirSync(config.uploadDir, { recursive: true });
 fs.mkdirSync(config.avatarUploadDir, { recursive: true });
+fs.mkdirSync(config.chatUploadDir, { recursive: true });
 
 // 老用户在服务启动后后台补齐默认 ARC 知识库；不阻塞 HTTP 服务启动。
 defaultKbs.scheduleForUsers(auth.listUsers());
@@ -235,12 +236,22 @@ async function handleApi(req, res, parsed) {
   if (pathname === "/api/skills" && method === "POST") {
     try {
       const body = await readJson(req);
-      const permittedTools = new Set(publicCatalog().map((tool) => tool.id));
-      body.toolIds = Array.isArray(body.toolIds) ? Array.from(new Set(body.toolIds.filter((id) => typeof id === "string" && permittedTools.has(id)))) : [];
-      body.keywords = Array.isArray(body.keywords) ? Array.from(new Set(body.keywords.filter((item) => typeof item === "string").map((item) => item.trim()).filter(Boolean))).slice(0, 32) : [];
       const skill = skillRegistry.saveCustom(body, user.id);
       return sendJSON(res, 201, { skill });
     } catch (error) { return sendJSON(res, 400, { error: error.message || "Skill 保存失败" }); }
+  }
+  if (pathname === "/api/skills/import" && method === "POST") {
+    try {
+      const contentType = String(req.headers["content-type"] || "");
+      const boundary = contentType.match(/boundary=(?:"([^"]+)"|([^;\s]+))/i);
+      if (!boundary) throw new Error("请使用 multipart/form-data 上传 ZIP 文件");
+      const { files } = parseMultipart(await readBody(req, 11 * 1024 * 1024), boundary[1] || boundary[2]);
+      const file = files.find((item) => item.fieldname === "skill") || files[0];
+      if (!file || !file.data.length) throw new Error("未检测到 Skill 压缩包");
+      if (!/\.zip$/i.test(path.basename(file.filename || ""))) throw new Error("仅支持 .zip 格式的 Skill 压缩包");
+      const skill = skillRegistry.importZip(file.data, user.id);
+      return sendJSON(res, 201, { skill });
+    } catch (error) { return sendJSON(res, 400, { error: error.message || "Skill 导入失败" }); }
   }
   if (pathname.startsWith("/api/skills/") && method === "DELETE") {
     const id = pathname.split("/").pop();
@@ -487,7 +498,12 @@ async function handleApi(req, res, parsed) {
   }
   if (pathname.startsWith("/api/conversations/") && method === "DELETE") {
     const id = pathname.split("/").pop();
+    const conv = store.getConversation(id, user.id);
     const ok = store.deleteConversation(id, user.id);
+    if (ok && conv) {
+      const folder = path.resolve(config.chatUploadDir, conv.id);
+      if (folder.startsWith(path.resolve(config.chatUploadDir) + path.sep)) fs.rmSync(folder, { recursive: true, force: true });
+    }
     return sendJSON(res, ok ? 200 : 404, { ok });
   }
   if (pathname.startsWith("/api/conversations/") && method === "PATCH") {
@@ -518,26 +534,60 @@ async function handleApi(req, res, parsed) {
     return sendJSON(res, 200, { conversation: summarizeConv(conv, user.id) });
   }
 
-  // ---------- 消息 ----------
+  // ---------- 消息与私有附件 ----------
+  const attachmentMatch = pathname.match(/^\/api\/conversations\/([^/]+)\/attachments\/([^/]+)$/);
+  if (attachmentMatch && method === "GET") {
+    const conv = store.getConversation(attachmentMatch[1], user.id);
+    if (!conv) return sendJSON(res, 404, { error: "会话不存在" });
+    const attachment = findConversationAttachment(conv, attachmentMatch[2]);
+    if (!attachment || !attachment.storedName) return sendJSON(res, 404, { error: "附件不存在" });
+    const filePath = path.resolve(config.chatUploadDir, conv.id, attachment.storedName);
+    const safeRoot = path.resolve(config.chatUploadDir, conv.id) + path.sep;
+    if (!filePath.startsWith(safeRoot) || !fs.existsSync(filePath)) return sendJSON(res, 404, { error: "附件文件不存在" });
+    const isInlineImage = attachment.isImage && /^(image\/(png|jpeg|gif|webp))$/.test(attachment.contentType || "");
+    res.writeHead(200, {
+      "Content-Type": attachment.contentType || "application/octet-stream",
+      "Content-Length": fs.statSync(filePath).size,
+      "Content-Disposition": (isInlineImage ? "inline" : "attachment") + "; filename*=UTF-8''" + encodeURIComponent(attachment.name || "附件"),
+      "X-Content-Type-Options": "nosniff",
+      "Cache-Control": "private, max-age=3600",
+    });
+    fs.createReadStream(filePath).pipe(res);
+    return;
+  }
   const msgMatch = pathname.match(/^\/api\/conversations\/([^/]+)\/messages$/);
   if (msgMatch && method === "POST") {
     const conv = store.getConversation(msgMatch[1], user.id);
     if (!conv) return sendJSON(res, 404, { error: "会话不存在" });
-    const body = await readJson(req);
-    const text = (body.text || "").trim();
-    if (!text) return sendJSON(res, 400, { error: "内容为空" });
-    // 单聊里 @ 标记无意义：保留但不强制走解析
+    const contentType = String(req.headers["content-type"] || "");
+    let text = "";
+    let files = [];
+    if (/^multipart\/form-data/i.test(contentType)) {
+      const boundary = contentType.match(/boundary=(?:"([^"]+)"|([^;\s]+))/i);
+      if (!boundary) return sendJSON(res, 400, { error: "附件上传格式无效" });
+      const multipart = parseMultipart(await readBody(req, config.maxChatAttachmentsTotalBytes + 1024 * 1024), boundary[1] || boundary[2]);
+      text = String(multipart.fields.text || "").trim();
+      files = multipart.files.filter((file) => file.fieldname === "attachments");
+    } else {
+      const body = await readJson(req);
+      text = String(body.text || "").trim();
+    }
+    if (!text && !files.length) return sendJSON(res, 400, { error: "请输入消息或添加附件" });
+    let attachments;
+    try { attachments = storeChatAttachments(conv, files); }
+    catch (error) { return sendJSON(res, 400, { error: error.message || "附件保存失败" }); }
     const msg = appendMessage(conv, {
       authorType: "human",
       author: user.id,
       authorName: user.displayName || user.login,
       authorAvatar: user.avatarUrl || "",
       content: text,
+      attachments,
       mentions: (text.match(/[@＠]([a-zA-Z0-9_-]+)/g) || []).map((s) => s.replace(/^[@＠]/, "")),
     });
     store.broadcast(conv.id, { type: "message", conversationId: conv.id, message: msg });
-    // 纯好友私聊没有智能体参与，仅广播用户消息；含 Agent 的会话再触发编排。
-    if (conv.memberAgentIds && conv.memberAgentIds.length) {
+    // 附件只在会话中展示和下载；不会传入 Agent。仅有文本时才触发原有编排。
+    if (text && conv.memberAgentIds && conv.memberAgentIds.length) {
       orchestrator.runConversation(conv, text).catch((e) => console.error("[run] error", e));
     }
     return sendJSON(res, 202, { ok: true, message: msg });
@@ -649,6 +699,51 @@ function summarizeKb(kb) {
   };
 }
 
+function safeAttachmentName(value) {
+  const name = path.basename(String(value || "附件")).replace(/[\x00-\x1f<>:"/\\|?*]/g, "_").trim();
+  return (name || "附件").slice(0, 180);
+}
+function contentTypeForAttachment(file) {
+  const data = file.data || Buffer.alloc(0);
+  if (data.length >= 8 && data.subarray(0, 8).equals(Buffer.from([0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A]))) return "image/png";
+  if (data.length >= 3 && data[0] === 0xFF && data[1] === 0xD8 && data[2] === 0xFF) return "image/jpeg";
+  if (data.length >= 6 && (data.subarray(0, 6).toString("ascii") === "GIF87a" || data.subarray(0, 6).toString("ascii") === "GIF89a")) return "image/gif";
+  if (data.length >= 12 && data.subarray(0, 4).toString("ascii") === "RIFF" && data.subarray(8, 12).toString("ascii") === "WEBP") return "image/webp";
+  return String(file.contentType || "application/octet-stream").split(";")[0].trim().slice(0, 120) || "application/octet-stream";
+}
+function storeChatAttachments(conv, files) {
+  if (!files.length) return [];
+  if (files.length > config.maxChatAttachments) throw new Error("一次最多发送 " + config.maxChatAttachments + " 个附件");
+  const totalBytes = files.reduce((total, file) => total + file.data.length, 0);
+  if (totalBytes > config.maxChatAttachmentsTotalBytes) throw new Error("附件总大小不能超过 50MB");
+  const folder = path.join(config.chatUploadDir, conv.id);
+  fs.mkdirSync(folder, { recursive: true });
+  const created = [];
+  try {
+    return files.map((file) => {
+      if (!file.data.length) throw new Error("不能发送空文件");
+      if (file.data.length > config.maxChatAttachmentBytes) throw new Error("单个附件不能超过 10MB");
+      const id = uid("attachment");
+      const extension = path.extname(safeAttachmentName(file.filename)).replace(/[^.a-zA-Z0-9]/g, "").slice(0, 16);
+      const storedName = id + extension;
+      const storedPath = path.join(folder, storedName);
+      fs.writeFileSync(storedPath, file.data, { flag: "wx" });
+      created.push(storedPath);
+      const contentType = contentTypeForAttachment(file);
+      return { id, name: safeAttachmentName(file.filename), size: file.data.length, contentType, storedName, isImage: /^(image\/(png|jpeg|gif|webp))$/.test(contentType) };
+    });
+  } catch (error) {
+    created.forEach((file) => { try { fs.unlinkSync(file); } catch (_) {} });
+    throw error;
+  }
+}
+function findConversationAttachment(conv, attachmentId) {
+  for (const message of conv.messages || []) {
+    const attachment = (message.attachments || []).find((item) => item && item.id === attachmentId);
+    if (attachment) return attachment;
+  }
+  return null;
+}
 function summarizeConv(conv, userId) {
   // 最后一条非系统消息，供前端会话列表做预览
   let last = null;
@@ -658,7 +753,7 @@ function summarizeConv(conv, userId) {
     last = {
       authorType: m.authorType,
       authorName: m.authorName,
-      content: String(m.content || "").replace(/\s+/g, " ").slice(0, 60),
+      content: String(m.content || "").replace(/\s+/g, " ").slice(0, 60) || ((m.attachments && m.attachments.length) ? "[附件] " + m.attachments[0].name : ""),
       ts: m.ts,
     };
     break;

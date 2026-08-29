@@ -2,21 +2,20 @@
 
 const fs = require("fs");
 const path = require("path");
+const crypto = require("crypto");
 const config = require("../config");
-const { uid } = require("../store");
+const { normalizeSkillEntries } = require("./zip-import");
 
 const SKILL_FILE = "SKILL.md";
 const MAX_BODY_CHARS = 30000;
 const MAX_RESOURCE_BYTES = 1024 * 1024;
 const TEXT_EXTENSIONS = new Set([".md", ".mdx", ".txt", ".json", ".yaml", ".yml", ".js", ".cjs", ".mjs", ".ts", ".py", ".sh", ".ps1", ".r", ".sql", ".csv"]);
 const SKIP_NAMES = new Set([".git", "node_modules", ".env"]);
+const STANDARD_NAME_RE = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
 
 function stringList(value, limit = 24) {
-  const values = Array.isArray(value) ? value : (typeof value === "string" ? value.split(",") : []);
+  const values = Array.isArray(value) ? value : (typeof value === "string" ? value.split(/[,\s]+/) : []);
   return Array.from(new Set(values.filter((item) => typeof item === "string").map((item) => item.trim()).filter(Boolean))).slice(0, limit);
-}
-function normalizeId(value, fallback) {
-  return String(value || fallback || "skill_" + uid("skill")).replace(/[^a-zA-Z0-9_-]/g, "_").replace(/^_+|_+$/g, "").slice(0, 96) || "skill_" + uid("skill");
 }
 function yamlValue(value) {
   const text = String(value || "").trim();
@@ -31,32 +30,42 @@ function yamlValue(value) {
 }
 function parseFrontmatter(source) {
   const normalized = String(source || "").replace(/^\uFEFF/, "").replace(/\r\n/g, "\n");
-  if (!normalized.startsWith("---\n")) return { meta: {}, body: normalized.trim() };
+  if (!normalized.startsWith("---\n")) throw new Error("SKILL.md 必须以 YAML frontmatter 开始");
   const end = normalized.indexOf("\n---", 4);
   if (end < 0) throw new Error("SKILL.md 的 frontmatter 未闭合");
-  const raw = normalized.slice(4, end).split("\n");
-  const meta = {}; let activeList = null;
-  for (const line of raw) {
+  const meta = {};
+  let activeObject = null;
+  for (const line of normalized.slice(4, end).split("\n")) {
     if (!line.trim() || line.trim().startsWith("#")) continue;
-    const list = line.match(/^\s+-\s+(.+)$/);
-    if (list && activeList) { meta[activeList].push(yamlValue(list[1])); continue; }
+    const nested = line.match(/^\s{2,}([A-Za-z][A-Za-z0-9_-]*):\s*(.*)$/);
+    if (nested && activeObject) {
+      meta[activeObject][nested[1]] = yamlValue(nested[2]);
+      continue;
+    }
     const match = line.match(/^([A-Za-z][A-Za-z0-9_-]*):(?:\s*(.*))?$/);
     if (!match) continue;
     const key = match[1]; const value = match[2] || "";
-    if (!value) { meta[key] = []; activeList = key; }
-    else { meta[key] = yamlValue(value); activeList = null; }
+    if (!value && key === "metadata") { meta.metadata = {}; activeObject = "metadata"; }
+    else { meta[key] = yamlValue(value); activeObject = null; }
   }
   const bodyStart = normalized.indexOf("\n", end + 4);
   return { meta, body: (bodyStart < 0 ? "" : normalized.slice(bodyStart + 1)).trim() };
 }
 function quoteYaml(value) { return JSON.stringify(String(value == null ? "" : value)); }
+function isStandardName(value) {
+  const name = String(value || "").trim();
+  return name.length >= 1 && name.length <= 64 && STANDARD_NAME_RE.test(name) && !name.includes("--");
+}
+function validateSkillName(name) {
+  if (!isStandardName(name)) throw new Error("Skill 名称必须为 1–64 位小写字母、数字和单连字符，例如 literature-review");
+}
 function serializeSkill(skill) {
-  const list = (name, values) => !values.length ? "" : name + ":\n" + values.map((value) => "  - " + quoteYaml(value)).join("\n") + "\n";
+  const displayName = String(skill.displayName || "").trim();
   return "---\n" +
     "name: " + quoteYaml(skill.name) + "\n" +
     "description: " + quoteYaml(skill.description) + "\n" +
-    "category: " + quoteYaml(skill.category) + "\n" +
-    list("keywords", skill.keywords) + list("toolIds", skill.toolIds) +
+    (skill.license ? "license: " + quoteYaml(skill.license) + "\n" : "") +
+    (displayName && displayName !== skill.name ? "metadata:\n  display_name: " + quoteYaml(displayName) + "\n" : "") +
     "---\n\n" + String(skill.instructions || "").trim() + "\n";
 }
 function isSafeRelativePath(value) {
@@ -78,16 +87,16 @@ class SkillRegistry {
   }
   _loadDir(dir, isCustom, ownerId) {
     if (!fs.existsSync(dir)) return;
-    for (const name of fs.readdirSync(dir)) {
-      const rootDir = path.join(dir, name);
-      if (!fs.statSync(rootDir).isDirectory() || SKIP_NAMES.has(name)) continue;
+    for (const directoryName of fs.readdirSync(dir)) {
+      const rootDir = path.join(dir, directoryName);
+      if (!fs.statSync(rootDir).isDirectory() || SKIP_NAMES.has(directoryName)) continue;
       const sourceFile = path.join(rootDir, SKILL_FILE);
       if (!fs.existsSync(sourceFile)) continue;
       try {
         const { meta, body } = parseFrontmatter(fs.readFileSync(sourceFile, "utf8"));
-        const skill = this._normalize(Object.assign({}, meta, { id: name, instructions: body }), isCustom, ownerId, rootDir, sourceFile);
-        if (skill) (isCustom ? this.customs : this.builtins).set((isCustom ? skill.ownerId + ":" : "") + skill.id, skill);
-      } catch (error) { console.error("[skill-registry] 加载 " + sourceFile + " 失败：", error.message); }
+        const skill = this._normalize(Object.assign({}, meta, { instructions: body }), isCustom, ownerId, rootDir, sourceFile, directoryName);
+        (isCustom ? this.customs : this.builtins).set((isCustom ? skill.ownerId + ":" : "") + skill.id, skill);
+      } catch (error) { console.error("[skill-registry] 跳过不符合 Agent Skills 规范的 " + sourceFile + "：" + error.message); }
     }
   }
   _resourceFiles(rootDir) {
@@ -99,22 +108,25 @@ class SkillRegistry {
         const full = path.join(dir, entry.name);
         if (entry.isDirectory()) { visit(full, depth + 1); continue; }
         if (!entry.isFile() || entry.name === SKILL_FILE || !TEXT_EXTENSIONS.has(path.extname(entry.name).toLowerCase())) continue;
-        const stat = fs.statSync(full);
-        if (stat.size <= MAX_RESOURCE_BYTES) files.push(path.relative(rootDir, full).split(path.sep).join("/"));
+        if (fs.statSync(full).size <= MAX_RESOURCE_BYTES) files.push(path.relative(rootDir, full).split(path.sep).join("/"));
       }
     };
     visit(rootDir, 0); return files.sort();
   }
-  _normalize(raw, isCustom, ownerId, rootDir, sourceFile) {
-    if (!raw || !String(raw.name || "").trim() || !String(raw.description || "").trim()) return null;
-    const id = normalizeId(raw.id);
+  _normalize(raw, isCustom, ownerId, rootDir, sourceFile, directoryName) {
+    const name = String(raw && raw.name || "").trim();
+    const description = String(raw && raw.description || "").trim();
+    validateSkillName(name);
+    if (directoryName && name !== directoryName) throw new Error("frontmatter 的 name 必须与目录名一致（期望 " + directoryName + "）");
+    if (!description || description.length > 1024) throw new Error("description 必填且不得超过 1024 个字符");
+    const metadata = raw && raw.metadata && typeof raw.metadata === "object" ? raw.metadata : {};
     return {
-      id, ownerId: isCustom ? (ownerId || "") : null,
-      name: String(raw.name).trim().slice(0, 80), category: String(raw.category || "通用").trim().slice(0, 40),
-      description: String(raw.description).trim().slice(0, 400),
-      instructions: String(raw.instructions || "").trim().slice(0, MAX_BODY_CHARS),
-      keywords: stringList(raw.keywords, 32), toolIds: stringList(raw.toolIds, 16), builtin: !isCustom,
-      rootDir, sourceFile, resourceFiles: rootDir ? this._resourceFiles(rootDir) : [],
+      id: name, name, ownerId: isCustom ? (ownerId || "") : null,
+      displayName: String(metadata.display_name || metadata.displayName || raw.displayName || name).trim().slice(0, 80),
+      description: description.slice(0, 1024),
+      instructions: String(raw && raw.instructions || "").trim().slice(0, MAX_BODY_CHARS),
+      license: String(raw && raw.license || "").trim().slice(0, 200),
+      builtin: !isCustom, rootDir, sourceFile, resourceFiles: rootDir ? this._resourceFiles(rootDir) : [],
     };
   }
   _public(skill) {
@@ -131,15 +143,55 @@ class SkillRegistry {
   resolve(ids, ownerId) { return stringList(ids).map((id) => this.get(id, ownerId)).filter(Boolean); }
   saveCustom(raw, ownerId) {
     if (!ownerId) throw new Error("缺少用户身份");
-    const existing = raw.id ? this.get(raw.id, ownerId) : null;
-    const id = normalizeId(raw.id || (existing && existing.id));
-    const rootDir = path.join(config.customSkillsDir, ownerId, id);
+    const requestedName = String(raw && raw.name || "").trim();
+    validateSkillName(requestedName);
+    if (raw.id && raw.id !== requestedName) throw new Error("已创建 Skill 的标准名称不可修改；请新建一个 Skill");
+    const existing = this.get(requestedName, ownerId);
+    const rootDir = path.join(config.customSkillsDir, ownerId, requestedName);
     const sourceFile = path.join(rootDir, SKILL_FILE);
-    const draft = Object.assign({}, existing || {}, raw, { id });
-    if (!String(draft.name || "").trim() || !String(draft.description || "").trim()) throw new Error("SKILL.md 必须包含 name 和 description");
+    const draft = Object.assign({}, existing || {}, raw, { name: requestedName, id: requestedName });
+    if (!String(draft.description || "").trim()) throw new Error("SKILL.md 必须包含 description");
     fs.mkdirSync(rootDir, { recursive: true });
-    const skill = this._normalize(draft, true, ownerId, rootDir, sourceFile);
+    const skill = this._normalize(draft, true, ownerId, rootDir, sourceFile, requestedName);
     fs.writeFileSync(sourceFile, serializeSkill(skill), "utf8");
+    this.customs.set(ownerId + ":" + skill.id, skill);
+    return this._public(skill);
+  }
+  importZip(archive, ownerId) {
+    if (!ownerId) throw new Error("缺少用户身份");
+    const entries = normalizeSkillEntries(archive);
+    const skillEntry = entries.find((entry) => entry.path === SKILL_FILE);
+    if (!skillEntry) throw new Error("压缩包缺少 SKILL.md");
+    if (skillEntry.data.includes(0)) throw new Error("SKILL.md 必须是 UTF-8 文本文件");
+    let parsed;
+    try { parsed = parseFrontmatter(skillEntry.data.toString("utf8")); }
+    catch (error) { throw new Error("SKILL.md 格式无效：" + error.message); }
+    const name = String(parsed.meta.name || "").trim();
+    validateSkillName(name);
+    if (this.customs.has(ownerId + ":" + name)) throw new Error("已存在同名的个人 Skill：" + name);
+    const ownerDir = path.join(config.customSkillsDir, ownerId);
+    const rootDir = path.join(ownerDir, name);
+    const sourceFile = path.join(rootDir, SKILL_FILE);
+    if (fs.existsSync(rootDir)) throw new Error("Skill 目录已存在：" + name);
+    const draft = Object.assign({}, parsed.meta, { instructions: parsed.body });
+    const normalized = this._normalize(draft, true, ownerId, null, null, name);
+    fs.mkdirSync(ownerDir, { recursive: true });
+    const stagingDir = path.join(ownerDir, ".import-" + crypto.randomUUID());
+    try {
+      fs.mkdirSync(stagingDir);
+      for (const entry of entries) {
+        const target = path.resolve(stagingDir, ...entry.path.split("/"));
+        if (!target.startsWith(stagingDir + path.sep)) throw new Error("压缩包中存在不安全的文件路径");
+        fs.mkdirSync(path.dirname(target), { recursive: true });
+        fs.writeFileSync(target, entry.data, { flag: "wx" });
+      }
+      fs.renameSync(stagingDir, rootDir);
+    } catch (error) {
+      fs.rmSync(stagingDir, { recursive: true, force: true });
+      fs.rmSync(rootDir, { recursive: true, force: true });
+      throw error;
+    }
+    const skill = Object.assign({}, normalized, { rootDir, sourceFile, resourceFiles: this._resourceFiles(rootDir) });
     this.customs.set(ownerId + ":" + skill.id, skill);
     return this._public(skill);
   }
@@ -166,8 +218,8 @@ class SkillRegistry {
     const lines = content.split(/\r?\n/);
     const from = Math.max(1, Number(startLine) || 1);
     const to = Math.min(lines.length, Math.max(from, Number(endLine) || Math.min(lines.length, from + 239)));
-    return { skillId: skill.id, skillName: skill.name, path: requested, startLine: from, endLine: to, totalLines: lines.length, content: lines.slice(from - 1, to).join("\n"), declaredTools: requested === SKILL_FILE ? skill.toolIds : undefined, resources: requested === SKILL_FILE ? skill.resourceFiles : undefined };
+    return { skillId: skill.id, skillName: skill.displayName, path: requested, startLine: from, endLine: to, totalLines: lines.length, content: lines.slice(from - 1, to).join("\n"), resources: requested === SKILL_FILE ? skill.resourceFiles : undefined };
   }
 }
 
-module.exports = { SkillRegistry, SKILL_FILE, parseFrontmatter };
+module.exports = { SkillRegistry, SKILL_FILE, parseFrontmatter, isStandardName };

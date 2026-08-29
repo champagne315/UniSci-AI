@@ -34,9 +34,8 @@ function createSkillReader() {
     const startLine = Math.max(1, Number(input.startLine) || 1);
     const endLine = Math.min(lines.length, Math.max(startLine, Number(input.endLine) || Math.min(lines.length, startLine + 239)));
     return {
-      skillId: skill.id, skillName: skill.name, path: requested, startLine, endLine, totalLines: lines.length,
+      skillId: skill.id, skillName: skill.displayName || skill.name, path: requested, startLine, endLine, totalLines: lines.length,
       content: lines.slice(startLine - 1, endLine).join("\n"),
-      declaredTools: requested === SKILL_FILE ? skill.toolIds : undefined,
       resources: requested === SKILL_FILE ? skill.resourceFiles : undefined,
     };
   };

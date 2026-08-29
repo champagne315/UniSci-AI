@@ -307,6 +307,7 @@ body.coboot-skin .friends-page { max-width: none; }
 body.coboot-skin .friend-add-row input,
 body.coboot-skin .friend-item,
 body.coboot-skin .user-id-card { border: 2px solid var(--ink); background: var(--milk); border-radius: 12px; color: var(--ink); }
+body.coboot-skin .friend-add-row input { padding-left: 16px; }
 body.coboot-skin .friend-item { background: #fff; box-shadow: 2px 2px 0 var(--ink); }
 body.coboot-skin .friend-avatar { border: 2px solid var(--ink); background: var(--cyan); }
 
@@ -347,6 +348,15 @@ body.coboot-skin .config-field input:focus,
 body.coboot-skin .config-field textarea:focus,
 body.coboot-skin .kb-paste-area textarea:focus,
 body.coboot-skin .kb-search-row input:focus { background: var(--yellow); border-color: var(--ink); box-shadow: 4px 4px 0 var(--ink); }
+body.coboot-skin .config-field .input-prefix {
+  width: 100%; border: 2px solid var(--ink); border-radius: 11px; background: #fff; box-shadow: 2px 2px 0 var(--ink);
+}
+body.coboot-skin .config-field .input-prefix:focus-within { background: var(--yellow); border-color: var(--ink); box-shadow: 4px 4px 0 var(--ink); }
+body.coboot-skin .config-field .input-prefix input[type=text],
+body.coboot-skin .config-field .input-prefix input[type=text]:focus {
+  flex: 1 1 auto; min-width: 0; width: auto; border: 0; border-radius: 0; background: transparent; box-shadow: none;
+}
+body.coboot-skin .agent-heading code { color: var(--ink); }
 body.coboot-skin .agent-option-card,
 body.coboot-skin .kb-pop-option,
 body.coboot-skin .agent-kb-option,
@@ -369,6 +379,8 @@ body.coboot-skin .agent-config-main { background: #fff; border: 2px solid var(--
 body.coboot-skin .config-section + .config-section { border-top: 2px solid var(--ink); }
 body.coboot-skin .config-section-head h2,
 body.coboot-skin .agent-kb-head h2 { font-weight: 950; }
+body.coboot-skin .capability-summary { border: 2px solid var(--ink); border-radius: 12px; background: var(--milk); box-shadow: 2px 2px 0 var(--ink); }
+body.coboot-skin .agent-capabilities-card { border: 3px solid var(--ink); box-shadow: 9px 9px 0 var(--ink); }
 body.coboot-skin .avatar-option { border: 2px solid var(--ink); background: #fff; border-radius: 12px; box-shadow: 2px 2px 0 var(--ink); }
 body.coboot-skin .avatar-option.selected { border-color: var(--ink); background: var(--yellow); box-shadow: 3px 3px 0 var(--ink); }
 body.coboot-skin .avatar-upload-btn { border: 2px solid var(--ink); background: var(--cyan); color: var(--ink); box-shadow: 2px 2px 0 var(--ink); }

@@ -32,10 +32,11 @@ const state = {
   reconnectTries: 0, reconnectTimer: null, maxReconnectTries: 10,
   convQuery: "", convKind: "all", convDeleting: null,
   agentQuery: "", agentCat: "全部",
-  skillQuery: "", skillCat: "全部",
+  skillQuery: "",
   kbQuery: "", kbDeleting: null, currentKb: null, rag: null,
   wizard: { step: 0, title: "", memberIds: [], memberUserIds: [] },
   groupMembers: null,
+  pendingAttachments: [],
 };
 
 const $ = (id) => document.getElementById(id);
@@ -119,9 +120,9 @@ function applyTheme(theme, persist = false) {
 }
 
 function restoreTheme() {
-  let saved = "station";
-  try { saved = localStorage.getItem(themeStorageKey()) || "station"; } catch (_error) {}
-  applyTheme(saved, false);
+  const themes = Object.keys(THEME_OPTIONS);
+  const randomTheme = themes[Math.floor(Math.random() * themes.length)];
+  applyTheme(randomTheme, false);
 }
 
 function onboardingCompleted() {
@@ -524,7 +525,6 @@ function setupAuth() {
     try { await copyText(state.user && state.user.id); toast("用户 ID 已复制", "ok"); }
     catch (error) { console.warn("复制用户 ID 失败：", error); toast("复制失败，请手动复制", "err"); }
   };
-  $("openFriendsBtn").onclick = () => { closeModal($("settingsModal")); switchView("friends"); };
   $("openAppearanceBtn").onclick = () => {
     applyTheme(state.theme, false);
     setSettingsView("appearance");
@@ -638,7 +638,7 @@ async function bootWorkspace() {
   if (agentsResult.status === "fulfilled") state.agents = agentsResult.value.agents || [];
   if (skillsResult.status === "fulfilled") state.skills = skillsResult.value.skills || [];
   if (toolsResult.status === "fulfilled") state.toolCatalog = toolsResult.value.tools || [];
-  renderAgentCats(); renderAgentGrid(); renderSkillCats(); renderSkillGrid();
+  renderAgentCats(); renderAgentGrid(); renderSkillGrid();
   if (convsResult.status === "fulfilled") await seedDefaultConversation();
   renderChat();
   if (state.user) connectGlobalSSE();
@@ -796,48 +796,30 @@ function renderAgentGrid() {
 let editingSkill = null;
 let skillInitialSnapshot = "";
 let skillSaving = false;
-const SKILL_FIELD_IDS = ["sName", "sCategory", "sDescription", "sKeywords", "sInstructions"];
+const SKILL_FIELD_IDS = ["sName", "sDisplayName", "sDescription", "sInstructions"];
+const SKILL_NAME_RE = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
 
 function visibleSkills() {
   const query = state.skillQuery.trim().toLowerCase();
-  return state.skills.filter((skill) => {
-    if (state.skillCat !== "全部" && (skill.category || "通用") !== state.skillCat) return false;
-    if (!query) return true;
-    return [skill.name, skill.category, skill.description, skill.instructions, (skill.keywords || []).join(" ")]
-      .some((field) => String(field || "").toLowerCase().includes(query));
-  });
-}
-
-function renderSkillCats() {
-  const cats = ["全部"].concat(Array.from(new Set(state.skills.map((skill) => skill.category || "通用"))));
-  const el = $("skillCats");
-  el.innerHTML = cats.map((category) => '<button class="cat-chip' + (category === state.skillCat ? " active" : "") + '" data-skill-cat="' + esc(category) + '">' + esc(category) + "</button>").join("");
-  el.querySelectorAll("[data-skill-cat]").forEach((button) => {
-    button.onclick = () => { state.skillCat = button.dataset.skillCat; renderSkillCats(); renderSkillGrid(); };
-  });
+  if (!query) return state.skills;
+  return state.skills.filter((skill) => [skill.name, skill.displayName, skill.description, skill.instructions]
+    .some((field) => String(field || "").toLowerCase().includes(query)));
 }
 
 function renderSkillGrid() {
   const el = $("skillGrid");
   const list = visibleSkills();
   if (!list.length) {
-    el.innerHTML = '<div class="page-empty"><div class="pe-title">' + (state.skillQuery ? "没有匹配的 Skill" : "还没有 Skill") + '</div><div class="pe-hint">' + (state.skillQuery ? "换个关键词试试。" : "创建一个可复用的科研方法与工具能力包。") + "</div></div>";
+    el.innerHTML = '<div class="page-empty"><div class="pe-title">' + (state.skillQuery ? "没有匹配的 Skill" : "还没有 Skill") + '</div><div class="pe-hint">' + (state.skillQuery ? "换个名称或说明试试。" : "创建一个可复用、可移植的科研任务指令与资源包。") + "</div></div>";
     return;
   }
   el.innerHTML = list.map((skill) => {
-    const usedBy = state.agents.filter((agent) => (agent.skillIds || []).includes(skill.id)).length;
-    const tools = (skill.toolIds || []).map((id) => (state.toolCatalog.find((tool) => tool.id === id) || {}).label || id);
+    const displayName = skill.displayName || skill.name;
     return '<article class="skill-card" data-skill-id="' + esc(skill.id) + '">' +
-      '<div class="skill-card-top"><div class="skill-glyph">✦</div><div><h2>' + esc(skill.name) + '</h2><p>' + esc(skill.category || "通用") + (skill.builtin ? " · 内置" : " · 我的 Skill") + "</p></div></div>" +
-      '<p class="skill-desc">' + esc(skill.description || "尚未填写简介") + "</p>" +
-      '<div class="skill-tags">' + (skill.keywords || []).slice(0, 4).map((keyword) => '<span class="chip">' + esc(keyword) + "</span>").join("") + (tools.length ? '<span class="chip skill-tool-chip">' + esc(tools.length + " 个工具") + "</span>" : "") + "</div>" +
-      '<div class="skill-card-foot"><span>' + usedBy + ' 位 Agent 已安装 · ' + ((skill.resourceFiles || []).length ? (skill.resourceFiles || []).length + ' 个附加文件' : '仅 SKILL.md') + '</span><button class="ac-edit" type="button" data-skill-edit="' + esc(skill.id) + '">配置</button></div></article>';
+      '<div class="skill-card-head"><div class="skill-glyph">✦</div><h2>' + esc(displayName) + '</h2><button class="skill-config-btn" type="button" data-skill-edit="' + esc(skill.id) + '" aria-label="配置 ' + esc(displayName) + '">配置</button></div>' +
+      '<p class="skill-desc">' + esc(skill.description || "尚未填写简介") + "</p></article>";
   }).join("");
   el.querySelectorAll("[data-skill-edit]").forEach((button) => { button.onclick = () => openSkillDetail(button.dataset.skillEdit); });
-}
-
-function selectedSkillToolIds() {
-  return Array.from($("sToolPicker").querySelectorAll("input[data-skill-toolid]:checked:not(:disabled)")).map((input) => input.dataset.skillToolid);
 }
 
 function skillDraft() {
@@ -845,11 +827,9 @@ function skillDraft() {
   return {
     id: editingSkill ? editingSkill.id : undefined,
     name,
-    category: $("sCategory").value.trim() || "通用",
+    displayName: $("sDisplayName").value.trim() || name,
     description: $("sDescription").value.trim(),
-    keywords: parseSkills($("sKeywords").value),
     instructions: $("sInstructions").value.trim(),
-    toolIds: selectedSkillToolIds().sort(),
   };
 }
 
@@ -860,22 +840,14 @@ function updateSkillConfigState() {
   $("sPromptCount").textContent = $("sInstructions").value.trim().length.toLocaleString("zh-CN") + " 字";
   const name = $("sName").value.trim();
   const description = $("sDescription").value.trim();
-  $("skillConfigTitle").textContent = editingSkill ? "配置 " + (name || editingSkill.name) : "新建 Skill";
+  const validName = SKILL_NAME_RE.test(name) && name.length <= 64;
+  $("skillConfigTitle").textContent = editingSkill ? "配置 " + ($("sDisplayName").value.trim() || name || editingSkill.displayName || editingSkill.name) : "新建 Skill";
   const dirty = skillHasChanges();
   const stateEl = $("sDirtyState");
   stateEl.classList.toggle("dirty", dirty && !skillSaving); stateEl.classList.toggle("saving", skillSaving);
   stateEl.textContent = skillSaving ? "正在保存…" : (dirty ? "有未保存的更改" : (editingSkill ? "所有更改已保存" : "填写配置后创建"));
   $("sCancel").textContent = dirty ? "放弃更改" : "返回列表";
-  $("sSave").disabled = skillSaving || !name || !description;
-}
-
-function renderSkillToolPicker(selectedIds) {
-  const selected = new Set(selectedIds || []);
-  $("sToolPicker").innerHTML = (state.toolCatalog || []).map((tool) => {
-    const checked = tool.default || selected.has(tool.id);
-    const disabled = tool.default ? " disabled" : "";
-    return '<label class="agent-tool-option' + (tool.default ? " baseline" : "") + '"><input type="checkbox" data-skill-toolid="' + esc(tool.id) + '"' + (checked ? " checked" : "") + disabled + ' /><span><b>' + esc(tool.label) + '</b><i>' + esc(tool.description) + '</i></span><em>' + (tool.risk === "write" ? "需审批" : "默认可用") + "</em></label>";
-  }).join("");
+  $("sSave").disabled = skillSaving || !validName || !description;
 }
 
 function showSkillConfig() {
@@ -888,16 +860,17 @@ function openSkillDetail(id) {
   if (!skill) return;
   editingSkill = skill;
   $("sConfigKicker").textContent = skill.builtin ? "内置 Skill · 保存后创建个人版本" : "我的 Skill";
-  $("sName").value = skill.name; $("sCategory").value = skill.category || ""; $("sDescription").value = skill.description || "";
-  $("sKeywords").value = (skill.keywords || []).join(", "); $("sInstructions").value = skill.instructions || "";
-  $("sDelete").classList.toggle("hidden", !!skill.builtin); renderSkillToolPicker(skill.toolIds || []); showSkillConfig();
+  $("sName").value = skill.name; $("sName").readOnly = true;
+  $("sDisplayName").value = skill.displayName || skill.name; $("sDescription").value = skill.description || "";
+  $("sInstructions").value = skill.instructions || "";
+  $("sDelete").classList.toggle("hidden", !!skill.builtin); showSkillConfig();
   skillInitialSnapshot = currentSkillSnapshot(); updateSkillConfigState();
 }
 
 function openNewSkill() {
   editingSkill = null; $("sConfigKicker").textContent = "创建配置";
-  SKILL_FIELD_IDS.forEach((id) => { $(id).value = ""; }); $("sDelete").classList.add("hidden");
-  renderSkillToolPicker([]); showSkillConfig(); skillInitialSnapshot = currentSkillSnapshot(); updateSkillConfigState(); setTimeout(() => $("sName").focus(), 60);
+  SKILL_FIELD_IDS.forEach((id) => { $(id).value = ""; }); $("sName").readOnly = false; $("sDelete").classList.add("hidden");
+  showSkillConfig(); skillInitialSnapshot = currentSkillSnapshot(); updateSkillConfigState(); setTimeout(() => $("sName").focus(), 60);
 }
 
 function closeSkillConfig(force = false) {
@@ -908,16 +881,32 @@ function closeSkillConfig(force = false) {
 
 async function refreshSkills() {
   const response = await api.get("/api/skills"); state.skills = response.skills || [];
-  if (!state.skills.some((skill) => (skill.category || "通用") === state.skillCat)) state.skillCat = "全部";
-  renderSkillCats(); renderSkillGrid();
+  renderSkillGrid();
+}
+
+async function importSkillZip(file) {
+  if (!file) return;
+  if (!/\.zip$/i.test(file.name)) { toast("请选择 .zip 格式的 Skill 压缩包", "err"); return; }
+  if (file.size > 10 * 1024 * 1024) { toast("Skill 压缩包不能超过 10MB", "err"); return; }
+  const importButton = $("importSkillBtn");
+  importButton.disabled = true; importButton.textContent = "正在导入…";
+  try {
+    const formData = new FormData(); formData.append("skill", file, file.name);
+    const response = await fetch("/api/skills/import", { method: "POST", body: formData });
+    const result = await parseResponse(response);
+    await refreshSkills();
+    toast("已导入 Skill「" + (result.skill.displayName || result.skill.name) + "」", "ok");
+  } catch (error) { toast("导入失败：" + error.message, "err"); }
+  finally { importButton.disabled = false; importButton.textContent = "导入 ZIP"; $("skillZipInput").value = ""; }
 }
 
 async function saveSkill() {
   const body = skillDraft();
-  if (!body.name || !body.description) {
-    const field = !body.name ? $("sName") : $("sDescription");
+  if (!body.name || !SKILL_NAME_RE.test(body.name) || body.name.length > 64 || !body.description) {
+    const invalidName = !body.name || !SKILL_NAME_RE.test(body.name) || body.name.length > 64;
+    const field = invalidName ? $("sName") : $("sDescription");
     field.classList.add("invalid"); field.focus();
-    toast(!body.name ? "请先填写 Skill 名称" : "请先填写 Skill 简介", "err"); return;
+    toast(invalidName ? "标准名称须为 1–64 位小写字母、数字和单连字符" : "请先填写包含适用场景的 Skill 简介", "err"); return;
   }
   skillSaving = true; updateSkillConfigState();
   try { await api.post("/api/skills", body); await refreshSkills(); closeSkillConfig(true); toast(editingSkill && editingSkill.builtin ? "已创建个人 Skill 版本" : "Skill 已保存", "ok"); }
@@ -1710,6 +1699,7 @@ async function openConv(id) {
   const r = await api.get("/api/conversations/" + id);
   try { await loadFriends(); } catch (error) { console.warn("[friends] 资料刷新失败", error); }
   state.currentConv = r.conversation;
+  clearPendingAttachments();
   clearLocalUnread(id);
   state.streaming = {};
   state.lastSpeakerName = null;
@@ -2076,7 +2066,8 @@ function appendHumanMsg(msg) {
   const name = (liveUser && (liveUser.displayName || liveUser.login)) || msg.authorName || "用户";
   const avatar = (liveUser && liveUser.avatarUrl) || msg.authorAvatar || "";
   const el = msgShell({ key: msg.author || "human", name, avatar, color: "#FF5A36", ts: msg.ts, msgId: msg.id, me: isMe });
-  el.querySelector(".msg-slot").innerHTML = '<div class="bubble">' + md(msg.content) + "</div>";
+  const hasText = !!String(msg.content || "").trim();
+  el.querySelector(".msg-slot").innerHTML = (hasText ? '<div class="bubble">' + md(msg.content) + "</div>" : "") + attachmentHTML(msg.attachments, state.currentConv && state.currentConv.id);
   scrollFeed(true);
   return el;
 }
@@ -2348,6 +2339,16 @@ function updateAgentKbCount() {
 function updateAgentSkillCount() {
   const count = selectedAgentSkillIds().length;
   $("aSkillCount").textContent = count ? "已安装 " + count + " 个" : "未安装";
+  $("aSkillSummary").textContent = count ? "已添加 " + count + " 个 Skill。" : "暂未添加 Skill。";
+}
+
+function updateAgentToolSummary() {
+  const tools = state.toolCatalog || [];
+  const defaultTools = tools.filter((tool) => tool.default);
+  const selected = new Set(selectedAgentToolIds());
+  const extraCount = tools.filter((tool) => !tool.default && selected.has(tool.id)).length;
+  const defaultLabel = defaultTools.length ? "默认：" + defaultTools.map((tool) => tool.label).join("、") + "。" : "默认工具由系统提供。";
+  $("aToolSummary").textContent = extraCount ? defaultLabel + " 已添加 " + extraCount + " 个工具。" : defaultLabel;
 }
 
 function renderAvatarOptions() {
@@ -2377,6 +2378,7 @@ function updateAgentConfigSummary() {
 function refreshAgentConfigState() {
   updateAgentKbCount();
   updateAgentSkillCount();
+  updateAgentToolSummary();
   updateAgentConfigSummary();
   const dirty = agentHasChanges();
   const stateEl = $("aDirtyState");
@@ -2397,7 +2399,7 @@ function renderAgentSkillPicker(selectedIds) {
     updateAgentSkillCount();
     return;
   }
-  picker.innerHTML = state.skills.map((skill) => '<label class="agent-tool-option"><input type="checkbox" data-skillid="' + esc(skill.id) + '"' + (selected.has(skill.id) ? " checked" : "") + ' /><span><b>' + esc(skill.name) + '</b><i>' + esc(skill.description || "未填写简介") + '</i></span><em>' + esc(skill.category || "通用") + '</em></label>').join("");
+  picker.innerHTML = state.skills.map((skill) => '<label class="agent-tool-option"><input type="checkbox" data-skillid="' + esc(skill.id) + '"' + (selected.has(skill.id) ? " checked" : "") + ' /><span><b>' + esc(skill.displayName || skill.name) + '</b><i>' + esc(skill.description || "未填写简介") + '</i></span></label>').join("");
   picker.querySelectorAll("input[data-skillid]").forEach((input) => { input.onchange = refreshAgentConfigState; });
   updateAgentSkillCount();
 }
@@ -2413,6 +2415,17 @@ function renderAgentToolPicker(selectedIds) {
     return '<label class="agent-tool-option' + (tool.default ? " baseline" : "") + '"><input type="checkbox" data-toolid="' + esc(tool.id) + '"' + locked + ' /><span><b>' + esc(tool.label) + '</b><i>' + esc(tool.description) + '</i></span><em>' + badge + '</em></label>';
   }).join("") || '<div class="agent-kb-empty">工具目录加载失败，请刷新后重试。</div>';
   picker.querySelectorAll("input[data-toolid]").forEach((input) => { input.onchange = refreshAgentConfigState; });
+}
+
+function openAgentCapabilities(kind) {
+  const isSkills = kind === "skills";
+  $("agentCapabilitiesTitle").textContent = isSkills ? "添加 Skills" : "添加工具";
+  $("agentCapabilitiesHint").textContent = isSkills ? "选择当前智能体需要使用的 Skill。" : "默认工具始终可用；可在此授权额外工具。";
+  $("agentSkillsPanel").classList.toggle("hidden", !isSkills);
+  $("agentToolsPanel").classList.toggle("hidden", isSkills);
+  openModal($("agentCapabilitiesModal"));
+  const firstOption = (isSkills ? $("aSkillPicker") : $("aToolPicker")).querySelector("input:not(:disabled)");
+  if (firstOption) setTimeout(() => firstOption.focus(), 40);
 }
 
 function renderAgentKbPicker(selectedIds) {
@@ -2483,6 +2496,7 @@ function openNewAgent() {
 
 function closeAgentConfig(force = false) {
   if (!force && agentHasChanges() && !confirm("当前配置尚未保存，确定放弃这些更改吗？")) return false;
+  $("agentCapabilitiesModal").classList.add("hidden");
   $("agentConfigView").classList.add("hidden");
   $("agentCatalog").classList.remove("hidden");
   editingAgent = null;
@@ -2538,17 +2552,62 @@ async function deleteAgent() {
 /* ==========================================================================
    输入 / @ 补全
    ========================================================================== */
+function attachmentSize(bytes) {
+  if (bytes < 1024) return bytes + " B";
+  if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + " KB";
+  return (bytes / (1024 * 1024)).toFixed(1) + " MB";
+}
+function renderAttachmentDraft() {
+  const draft = $("attachmentDraft");
+  const files = state.pendingAttachments;
+  draft.classList.toggle("hidden", !files.length);
+  draft.innerHTML = files.map((file, index) => '<span class="attachment-draft-item"><b>' + esc(file.name) + '</b><i>' + attachmentSize(file.size) + '</i><button type="button" data-remove-attachment="' + index + '" aria-label="移除附件">×</button></span>').join("");
+  draft.querySelectorAll("[data-remove-attachment]").forEach((button) => {
+    button.onclick = () => { state.pendingAttachments.splice(Number(button.dataset.removeAttachment), 1); renderAttachmentDraft(); updateSendBtn(); };
+  });
+}
+function addAttachments(files) {
+  const incoming = Array.from(files || []);
+  if (!incoming.length) return;
+  const next = state.pendingAttachments.concat(incoming);
+  if (next.length > 5) { toast("一次最多添加 5 个附件", "err"); return; }
+  if (incoming.some((file) => file.size === 0)) { toast("不能发送空文件", "err"); return; }
+  if (incoming.some((file) => file.size > 10 * 1024 * 1024)) { toast("单个附件不能超过 10MB", "err"); return; }
+  if (next.reduce((total, file) => total + file.size, 0) > 50 * 1024 * 1024) { toast("附件总大小不能超过 50MB", "err"); return; }
+  state.pendingAttachments = next;
+  renderAttachmentDraft(); updateSendBtn();
+}
+function clearPendingAttachments() {
+  state.pendingAttachments = [];
+  $("attachmentInput").value = "";
+  renderAttachmentDraft();
+}
+function attachmentHTML(attachments, convId) {
+  if (!attachments || !attachments.length || !convId) return "";
+  return '<div class="message-attachments">' + attachments.map((attachment) => {
+    const href = "/api/conversations/" + encodeURIComponent(convId) + "/attachments/" + encodeURIComponent(attachment.id);
+    if (attachment.isImage) return '<a class="message-image" href="' + href + '" target="_blank" rel="noopener" title="打开 ' + esc(attachment.name) + '"><img src="' + href + '" alt="' + esc(attachment.name) + '" loading="lazy" /></a>';
+    return '<a class="message-file" href="' + href + '" download><span class="message-file-icon">⌁</span><span><b>' + esc(attachment.name) + '</b><i>' + attachmentSize(Number(attachment.size) || 0) + '</i></span></a>';
+  }).join("") + "</div>";
+}
 async function sendMessage() {
   const inp = $("input");
   const text = inp.value.trim();
-  if (!text) return;
+  const attachments = state.pendingAttachments.slice();
+  if (!text && !attachments.length) return;
   if (!state.currentConv) { toast("请先选择一个聊天"); return; }
   inp.value = "";
+  clearPendingAttachments();
   autosize();
   updateSendBtn();
   state.stick = true;
   try {
-    const r = await api.post("/api/conversations/" + state.currentConv.id + "/messages", { text });
+    let r;
+    if (attachments.length) {
+      const formData = new FormData(); formData.append("text", text);
+      attachments.forEach((file) => formData.append("attachments", file, file.name));
+      r = await fetch("/api/conversations/" + state.currentConv.id + "/messages", { method: "POST", body: formData }).then(parseResponse);
+    } else r = await api.post("/api/conversations/" + state.currentConv.id + "/messages", { text });
     // 与 SSE 广播去重：无论响应和广播谁先到，同一条消息只渲染一次
     if (r.message && !state.currentConv.messages.find((m) => m.id === r.message.id)) {
       state.currentConv.messages.push(r.message);
@@ -2557,6 +2616,8 @@ async function sendMessage() {
   } catch (e) {
     toast("发送失败：" + e.message, "err");
     inp.value = text;
+    state.pendingAttachments = attachments;
+    renderAttachmentDraft();
     autosize(); updateSendBtn();
   }
 }
@@ -2574,7 +2635,7 @@ function insertMention(a) {
 
 function updateSendBtn() {
   const btn = $("sendBtn");
-  btn.disabled = !$("input").value.trim() || !state.currentConv;
+  btn.disabled = (!$("input").value.trim() && !state.pendingAttachments.length) || !state.currentConv;
 }
 
 function autosize() {
@@ -2680,6 +2741,10 @@ function bindEvents() {
   $("aBack").onclick = () => closeAgentConfig();
   $("aCancel").onclick = () => closeAgentConfig();
   $("aDelete").onclick = deleteAgent;
+  $("manageSkillsBtn").onclick = () => openAgentCapabilities("skills");
+  $("manageToolsBtn").onclick = () => openAgentCapabilities("tools");
+  $("agentCapabilitiesClose").onclick = () => closeModal($("agentCapabilitiesModal"));
+  $("agentCapabilitiesDone").onclick = () => closeModal($("agentCapabilitiesModal"));
   AGENT_FIELD_IDS.forEach((id) => {
     $(id).addEventListener("input", () => {
       if (id === "aName") $("aName").classList.remove("invalid");
@@ -2716,6 +2781,8 @@ function bindEvents() {
   // Skill 市场
   $("skillSearch").addEventListener("input", (event) => { state.skillQuery = event.target.value; renderSkillGrid(); });
   $("newSkillBtn").onclick = openNewSkill;
+  $("importSkillBtn").onclick = () => $("skillZipInput").click();
+  $("skillZipInput").addEventListener("change", (event) => importSkillZip(event.target.files[0]));
   $("sSave").onclick = saveSkill;
   $("sBack").onclick = () => closeSkillConfig();
   $("sCancel").onclick = () => closeSkillConfig();
@@ -2723,7 +2790,6 @@ function bindEvents() {
   SKILL_FIELD_IDS.forEach((id) => {
     $(id).addEventListener("input", () => { if (id === "sName" || id === "sDescription") $(id).classList.remove("invalid"); updateSkillConfigState(); });
   });
-  $("sToolPicker").addEventListener("change", updateSkillConfigState);
 
   window.addEventListener("beforeunload", (event) => {
     if ((!$("agentConfigView").classList.contains("hidden") && agentHasChanges()) || (!$("skillConfigView").classList.contains("hidden") && skillHasChanges())) {
@@ -2789,6 +2855,14 @@ function bindEvents() {
     if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); sendMessage(); }
   });
   $("sendBtn").onclick = sendMessage;
+  $("attachmentBtn").onclick = () => {
+    if (!state.currentConv) { toast("请先选择一个聊天"); return; }
+    $("attachmentInput").click();
+  };
+  $("attachmentInput").addEventListener("change", (event) => {
+    addAttachments(event.target.files);
+    event.target.value = "";
+  });
   $("kbMountBtn").onclick = toggleKbPop;
 
   // 联系作者
