@@ -24,4 +24,3 @@ metadata:
 - 以“假设—设计—观测—判定—风险”结构交付。
 - 明确哪些指标是主要终点，哪些仅用于探索。
 - 对安全、伦理、设备限制或资源依赖给出前置条件。
-- 需要设计审查时读取 `references/design-checklist.md`；需要记录实验时读取 `references/experiment-record-template.md`。

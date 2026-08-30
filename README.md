@@ -123,7 +123,7 @@ set SHOW_REASONING=false                   :: 不广播思考过程
 
 - **数据**：内存存储，重启丢失（store 层已抽象，可平滑切 SQLite/Postgres）。
 - **RAG 向量**：已支持 OpenAI 兼容 Embedding 语义向量 + 本地 TF 混合排序；未配置或外部服务异常时自动回退词法检索。向量当前保存在进程内存，后续可切 Qdrant。
-- **文档格式**：纯文本（.txt/.md/.json/.csv/.py 等）直接解析；PDF 使用 `pdf-parse` 提取文字层，Word（.docx）使用 `mammoth` 提取正文；图片和扫描版 PDF 需配置 `GLM_OCR_API_KEY` 才能 OCR 入库。未能提取出文本的文件不会生成文档记录或索引，界面会显示具体失败原因。
+- **文档格式**：纯文本（.txt/.md/.json/.csv/.py 等）直接解析；PDF 使用 `pdf-parse` 提取文字层，Word（.docx）使用 `mammoth`、旧版 Word（.doc）使用 `word-extractor` 提取正文；图片和扫描版 PDF 需配置 `GLM_OCR_API_KEY` 才能 OCR 入库。未能提取出文本的文件不会生成文档记录或索引，界面会显示具体失败原因。
 - **Skill/工具模型**：Skill 遵循 Agent Skills 的 `SKILL.md` 目录规范，按需读取指令与资源；实际工具调用由 Agent 的显式授权与审批策略决定。MCP 注册中心尚未接入。
 - **飞书**：按既定决策暂缓，当前用「上传文档/粘贴文本」兜底入库。
 

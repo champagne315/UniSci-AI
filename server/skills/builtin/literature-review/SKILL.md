@@ -24,4 +24,3 @@ metadata:
 - 先给结论摘要，再列证据表与争议点。
 - 每个关键论断绑定来源；没有可靠来源时明确标注“待核验”。
 - 区分相关、预测与因果结论，避免把体外、模拟或小样本结果过度外推。
-- 需要结构化核查时读取 `references/evidence-checklist.md`；需要检索设计时读取 `references/search-log-template.md`。

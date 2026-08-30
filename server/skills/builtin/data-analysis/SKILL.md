@@ -24,4 +24,3 @@ metadata:
 - 先说明数据质量与适用范围，再给结果和限制。
 - 每张表或图应回答一个明确问题，并标注样本量、单位、比较基准和不确定性。
 - 将事实结果、解释和下一步假设分开表达。
-- 需要完整分析结构时读取 `references/analysis-plan.md`；需要发布前检查时读取 `references/results-quality-check.md`。

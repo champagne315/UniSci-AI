@@ -24,4 +24,3 @@ metadata:
 - 优先交付可审阅的提纲或段落，再给完整稿件。
 - 每段只承担一个主要功能，首句说明段落目的。
 - 对不确定、外推或因果表述使用与证据强度匹配的措辞。
-- 需要章节骨架时读取 `references/manuscript-outline.md`；需要语言审校时读取 `references/claim-language-ladder.md`。

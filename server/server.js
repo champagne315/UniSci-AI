@@ -212,6 +212,9 @@ async function handleApi(req, res, parsed) {
   if (pathname === "/api/friends" && method === "GET") {
     return sendJSON(res, 200, { friends: auth.listFriends(user.id) });
   }
+  if (pathname === "/api/friends/suggestions" && method === "GET") {
+    return sendJSON(res, 200, { users: auth.listPeopleYouMayKnow(user.id) });
+  }
   if (pathname === "/api/friends/request" && method === "POST") {
     try {
       const body = await readJson(req);
@@ -562,21 +565,26 @@ async function handleApi(req, res, parsed) {
     const contentType = String(req.headers["content-type"] || "");
     let text = "";
     let files = [];
+    let clientMessageId = "";
     if (/^multipart\/form-data/i.test(contentType)) {
       const boundary = contentType.match(/boundary=(?:"([^"]+)"|([^;\s]+))/i);
       if (!boundary) return sendJSON(res, 400, { error: "附件上传格式无效" });
       const multipart = parseMultipart(await readBody(req, config.maxChatAttachmentsTotalBytes + 1024 * 1024), boundary[1] || boundary[2]);
       text = String(multipart.fields.text || "").trim();
+      clientMessageId = String(multipart.fields.clientMessageId || "").trim();
       files = multipart.files.filter((file) => file.fieldname === "attachments");
     } else {
       const body = await readJson(req);
       text = String(body.text || "").trim();
+      clientMessageId = String(body.clientMessageId || "").trim();
     }
     if (!text && !files.length) return sendJSON(res, 400, { error: "请输入消息或添加附件" });
+    if (clientMessageId && !/^msg_client_[a-zA-Z0-9_-]{8,80}$/.test(clientMessageId)) return sendJSON(res, 400, { error: "消息标识无效" });
     let attachments;
     try { attachments = storeChatAttachments(conv, files); }
     catch (error) { return sendJSON(res, 400, { error: error.message || "附件保存失败" }); }
     const msg = appendMessage(conv, {
+      ...(clientMessageId ? { id: clientMessageId } : {}),
       authorType: "human",
       author: user.id,
       authorName: user.displayName || user.login,

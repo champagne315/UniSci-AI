@@ -194,6 +194,16 @@ function listFriends(userId) {
     createdAt: row.created_at, updatedAt: row.updated_at,
   }));
 }
+function listPeopleYouMayKnow(userId) {
+  const rows = db.prepare(`SELECT u.* FROM users u
+    WHERE u.id <> ? AND NOT EXISTS (
+      SELECT 1 FROM friendships f
+      WHERE ((f.user_low = ? AND f.user_high = u.id) OR (f.user_high = ? AND f.user_low = u.id))
+        AND f.status IN ('pending', 'accepted')
+    )
+    ORDER BY u.created_at DESC`).all(userId, userId, userId);
+  return rows.map(publicUser);
+}
 function sendFriendRequest(userId, targetId) {
   const target = userById(targetId);
   if (!target) throw new Error("未找到该用户 ID");
@@ -208,8 +218,13 @@ function sendFriendRequest(userId, targetId) {
     return { user: target, status: "accepted", direction: "outgoing", requesterId: existing.requester_id, createdAt: existing.created_at, updatedAt: now };
   }
   const [low, high] = orderedPair(userId, target.id);
-  db.prepare("INSERT INTO friendships (user_low, user_high, requester_id, status, created_at, updated_at) VALUES (?, ?, ?, 'pending', ?, ?)")
-    .run(low, high, userId, now, now);
+  if (existing && existing.status === "rejected") {
+    db.prepare("UPDATE friendships SET requester_id = ?, status = 'pending', created_at = ?, updated_at = ? WHERE user_low = ? AND user_high = ?")
+      .run(userId, now, now, low, high);
+  } else {
+    db.prepare("INSERT INTO friendships (user_low, user_high, requester_id, status, created_at, updated_at) VALUES (?, ?, ?, 'pending', ?, ?)")
+      .run(low, high, userId, now, now);
+  }
   return { user: target, status: "pending", direction: "outgoing", createdAt: now, updatedAt: now };
 }
 function respondFriendRequest(userId, targetId, accepted) {
@@ -226,4 +241,4 @@ function areFriends(userId, otherId) {
   return !!(friendship && friendship.status === "accepted");
 }
 
-module.exports = { register, login, logout, currentUser, changePassword, updateProfile, hasWelcomed, markWelcomed, validLogin, userById, listUsers, listFriends, sendFriendRequest, respondFriendRequest, areFriends };
+module.exports = { register, login, logout, currentUser, changePassword, updateProfile, hasWelcomed, markWelcomed, validLogin, userById, listUsers, listFriends, listPeopleYouMayKnow, sendFriendRequest, respondFriendRequest, areFriends };

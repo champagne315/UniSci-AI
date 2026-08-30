@@ -25,7 +25,7 @@ const state = {
   user: null,
   theme: "station",
   view: "chat",
-  agents: [], skills: [], convs: [], currentConv: null, kbs: [], friends: [], toolCatalog: [],
+  agents: [], skills: [], convs: [], currentConv: null, kbs: [], friends: [], friendSuggestions: [], toolCatalog: [],
   streaming: {}, evtSource: null, globalEvtSource: null, conversationRefreshTimer: null,
   lastSpeakerName: null,
   memberStatus: {}, stick: true,
@@ -1005,7 +1005,7 @@ function openKbDrawer(kb) {
   }
   html += '<div class="dw-sec-title" style="margin-top:20px">添加内容</div>';
   html += '<div class="kb-upload-zone" id="kbUploadZone" tabindex="0" role="button"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><path d="M17 8l-5-5-5 5M12 3v12"/></svg><span>点击上传文档，或拖拽文件到这里（MD / TXT / PDF / Word / 图片）</span></div>';
-  html += '<input type="file" id="kbFileInput" class="hidden" accept=".txt,.md,.json,.csv,.py,.js,.ts,.html,.css,.xml,.yaml,.yml,.pdf,.docx,.png,.jpg,.jpeg,.webp,.bmp,.gif" />';
+  html += '<input type="file" id="kbFileInput" class="hidden" accept=".txt,.md,.json,.csv,.py,.js,.ts,.html,.css,.xml,.yaml,.yml,.pdf,.doc,.docx,.png,.jpg,.jpeg,.webp,.bmp,.gif" />';
   html += '<div class="kb-paste-area"><textarea id="kbPasteText" rows="3" placeholder="或直接粘贴文本内容…"></textarea>' +
           '<div class="kb-paste-actions"><button class="primary-btn sm" id="kbPasteBtn">提交入库</button></div></div>';
   html += '<div class="kb-search-preview"><div class="dw-sec-title">检索效果预览</div>' +
@@ -1336,8 +1336,12 @@ function pickerAgents() {
 }
 function acceptedFriends() { return state.friends.filter((friend) => friend.status === "accepted"); }
 async function loadFriends() {
-  const response = await api.get("/api/friends");
-  state.friends = response.friends || [];
+  const [friendsResponse, suggestionsResponse] = await Promise.all([
+    api.get("/api/friends"),
+    api.get("/api/friends/suggestions"),
+  ]);
+  state.friends = friendsResponse.friends || [];
+  state.friendSuggestions = suggestionsResponse.users || [];
   return state.friends;
 }
 function friendLabel(friend) {
@@ -1359,6 +1363,9 @@ function convDisplayTitle(c) {
 function renderFriendsView() {
   const requests = state.friends.filter((friend) => friend.status === "pending" && friend.direction === "incoming");
   const friends = acceptedFriends();
+  $("friendSuggestionsList").innerHTML = state.friendSuggestions.length ? state.friendSuggestions.map((user) =>
+    '<div class="friend-item"><span class="friend-avatar">' + avatarMarkup(user.avatarUrl, presetFor(user.id)) + '</span><div class="friend-item-main"><b>' + esc(user.displayName || user.login || user.id) + '</b><small>' + esc(user.id) + '</small></div><button class="primary-btn sm" data-friend-suggest="' + esc(user.id) + '">添加</button></div>'
+  ).join("") : '<div class="dw-empty-note">暂时没有可添加的用户</div>';
   $("friendRequestsList").innerHTML = requests.length ? requests.map((friend) =>
     '<div class="friend-item"><span class="friend-avatar">' + avatarMarkup(friend.user.avatarUrl, presetFor(friend.user.id)) + '</span><div class="friend-item-main"><b>' + friendLabel(friend) + '</b><small>' + esc(friend.user.id) + '</small></div>' +
     '<button class="primary-btn sm" data-friend-respond="accept" data-user-id="' + esc(friend.user.id) + '">同意</button><button class="ghost-btn sm" data-friend-respond="reject" data-user-id="' + esc(friend.user.id) + '">拒绝</button></div>'
@@ -1366,6 +1373,18 @@ function renderFriendsView() {
   $("friendsList").innerHTML = friends.length ? friends.map((friend) =>
     '<div class="friend-item"><span class="friend-avatar">' + avatarMarkup(friend.user.avatarUrl, presetFor(friend.user.id)) + '</span><div class="friend-item-main"><b>' + friendLabel(friend) + '</b><small>' + esc(friend.user.id) + '</small></div></div>'
   ).join("") : '<div class="dw-empty-note">还没有好友</div>';
+  document.querySelectorAll("[data-friend-suggest]").forEach((button) => {
+    button.onclick = async () => {
+      const userId = button.dataset.friendSuggest;
+      button.disabled = true;
+      try {
+        const res = await api.post("/api/friends/request", { userId });
+        await loadFriends(); renderFriendsView();
+        if (res.friendship && res.friendship.status === "accepted") { await loadConvs(); toast("已添加好友", "ok"); }
+        else toast("好友请求已发送", "ok");
+      } catch (error) { toast("添加失败：" + error.message, "err"); button.disabled = false; }
+    };
+  });
   document.querySelectorAll("[data-friend-respond]").forEach((button) => {
     button.onclick = async () => {
       try {
@@ -1756,11 +1775,20 @@ function atBottom() {
   const b = feedEl();
   return b.scrollHeight - b.scrollTop - b.clientHeight < 140;
 }
+let scheduledScroll = null;
 function scrollFeed(force) {
-  const b = feedEl();
-  const jl = $("jumpLatest");
-  if (force || state.stick) { b.scrollTop = b.scrollHeight; state.stick = true; jl.classList.remove("show"); }
-  else jl.classList.add("show");
+  if (scheduledScroll) scheduledScroll.force = scheduledScroll.force || !!force;
+  else {
+    scheduledScroll = { force: !!force };
+    requestAnimationFrame(() => {
+      const b = feedEl();
+      const jl = $("jumpLatest");
+      const shouldStick = scheduledScroll.force || state.stick;
+      scheduledScroll = null;
+      if (shouldStick) { b.scrollTop = b.scrollHeight; state.stick = true; jl.classList.remove("show"); }
+      else jl.classList.add("show");
+    });
+  }
 }
 
 function convMembers() {
@@ -1803,12 +1831,15 @@ function renderChat() {
     box.innerHTML = '<div class="feed-empty"><div class="es-text">该聊天没有可用成员</div><div class="es-hint">相关成员可能已不可用</div></div>';
     return;
   }
+  // 历史消息一次性渲染完后直接定位到底部，避免 CSS 平滑滚动从首条滑到最新消息。
+  box.style.scrollBehavior = "auto";
   // 单聊不显示成员已加入等群聊系统提示
   if (isGroup()) appendSystemLine((convMembers().length + humanCount) + " 位成员已加入群聊");
   for (const m of (conv.messages || [])) routeMessage(m);
   setStatus(conv.status, conv.pendingApproval);
   if (conv.pendingApproval) showGlobalApproval(conv.pendingApproval);
   scrollFeed(true);
+  requestAnimationFrame(() => { box.style.scrollBehavior = ""; });
 }
 
 function renderChatHeader() {
@@ -2114,12 +2145,13 @@ function onEvent(j) {
       setStatus(j.status, conv.pendingApproval);
       if (j.status === "idle") loadConvs();
       break;
-    case "message":
-      if (conv.messages.find((m) => m.id === j.message.id)) break;
-      conv.messages.push(j.message);
-      routeMessage(j.message);
+    case "message": {
+      const existing = conv.messages.find((m) => m.id === j.message.id);
+      if (existing) Object.assign(existing, j.message);
+      else { conv.messages.push(j.message); routeMessage(j.message); }
       markCurrentConversationRead();
       break;
+    }
     case "agent_start": startAgentStream(j); setStatus("running"); break;
     case "agent_token": appendAgentToken(j.agentId, j.token); break;
     case "agent_reasoning": appendAgentReasoning(j.agentId, j.token); break;
@@ -2585,35 +2617,52 @@ function clearPendingAttachments() {
 function attachmentHTML(attachments, convId) {
   if (!attachments || !attachments.length || !convId) return "";
   return '<div class="message-attachments">' + attachments.map((attachment) => {
+    const label = '<span class="message-file-icon">⌁</span><span><b>' + esc(attachment.name) + '</b><i>' + attachmentSize(Number(attachment.size) || 0) + (attachment.pending ? " · 发送中" : "") + '</i></span>';
+    if (attachment.pending) return '<div class="message-file pending">' + label + '</div>';
     const href = "/api/conversations/" + encodeURIComponent(convId) + "/attachments/" + encodeURIComponent(attachment.id);
     if (attachment.isImage) return '<a class="message-image" href="' + href + '" target="_blank" rel="noopener" title="打开 ' + esc(attachment.name) + '"><img src="' + href + '" alt="' + esc(attachment.name) + '" loading="lazy" /></a>';
-    return '<a class="message-file" href="' + href + '" download><span class="message-file-icon">⌁</span><span><b>' + esc(attachment.name) + '</b><i>' + attachmentSize(Number(attachment.size) || 0) + '</i></span></a>';
+    return '<a class="message-file" href="' + href + '" download>' + label + '</a>';
   }).join("") + "</div>";
+}
+function clientMessageId() {
+  const token = window.crypto && crypto.randomUUID ? crypto.randomUUID().replace(/-/g, "") : (Date.now().toString(36) + Math.random().toString(36).slice(2));
+  return "msg_client_" + token;
+}
+function optimisticAttachments(files) {
+  return files.map((file, index) => ({ id: "pending_" + index, name: file.name, size: file.size, contentType: file.type || "application/octet-stream", isImage: false, pending: true }));
 }
 async function sendMessage() {
   const inp = $("input");
   const text = inp.value.trim();
   const attachments = state.pendingAttachments.slice();
   if (!text && !attachments.length) return;
-  if (!state.currentConv) { toast("请先选择一个聊天"); return; }
+  const conv = state.currentConv;
+  if (!conv) { toast("请先选择一个聊天"); return; }
+  const messageId = clientMessageId();
+  const optimistic = {
+    id: messageId, ts: Date.now(), authorType: "human", author: state.user && state.user.id,
+    authorName: (state.user && (state.user.displayName || state.user.login)) || "我", authorAvatar: (state.user && state.user.avatarUrl) || "",
+    content: text || (attachments.length ? "正在发送附件…" : ""), attachments: optimisticAttachments(attachments), mentions: [], meta: {}, pending: true,
+  };
   inp.value = "";
   clearPendingAttachments();
-  autosize();
-  updateSendBtn();
-  state.stick = true;
+  autosize(); updateSendBtn(); state.stick = true;
+  conv.messages.push(optimistic);
+  routeMessage(optimistic);
   try {
     let r;
     if (attachments.length) {
-      const formData = new FormData(); formData.append("text", text);
+      const formData = new FormData(); formData.append("text", text); formData.append("clientMessageId", messageId);
       attachments.forEach((file) => formData.append("attachments", file, file.name));
-      r = await fetch("/api/conversations/" + state.currentConv.id + "/messages", { method: "POST", body: formData }).then(parseResponse);
-    } else r = await api.post("/api/conversations/" + state.currentConv.id + "/messages", { text });
-    // 与 SSE 广播去重：无论响应和广播谁先到，同一条消息只渲染一次
-    if (r.message && !state.currentConv.messages.find((m) => m.id === r.message.id)) {
-      state.currentConv.messages.push(r.message);
-      routeMessage(r.message);
-    }
+      r = await fetch("/api/conversations/" + conv.id + "/messages", { method: "POST", body: formData }).then(parseResponse);
+    } else r = await api.post("/api/conversations/" + conv.id + "/messages", { text, clientMessageId: messageId });
+    const index = conv.messages.findIndex((message) => message.id === messageId);
+    if (index >= 0 && r.message) conv.messages[index] = r.message;
+    if (state.currentConv && state.currentConv.id === conv.id) renderChat();
   } catch (e) {
+    const index = conv.messages.findIndex((message) => message.id === messageId);
+    if (index >= 0) conv.messages.splice(index, 1);
+    if (state.currentConv && state.currentConv.id === conv.id) renderChat();
     toast("发送失败：" + e.message, "err");
     inp.value = text;
     state.pendingAttachments = attachments;

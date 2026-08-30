@@ -2,7 +2,7 @@
 
 // 文档解析 + 切块：
 // 纯文本（.txt .md .json .csv 及常见代码文件）直接读取；
-// PDF 用 pdf-parse、Word(.docx) 用 mammoth 提取文本；
+// PDF 用 pdf-parse、Word(.docx) 用 mammoth、旧版 Word(.doc) 用 word-extractor 提取文本；
 // 图片与无文字层的扫描版 PDF 用智谱 GLM-OCR 识别为 Markdown，统一进入同一套切块/索引流程。
 
 const fs = require("fs");
@@ -20,7 +20,7 @@ const TEXT_EXT = new Set([
 ]);
 
 // 二进制文档解析器（懒加载，缺依赖时给出可读提示而非崩溃）
-const DOC_EXT = new Set([".pdf", ".docx"]);
+const DOC_EXT = new Set([".pdf", ".doc", ".docx"]);
 
 // 图片格式（走 GLM-OCR）
 const IMAGE_EXT = new Set([".png", ".jpg", ".jpeg", ".webp", ".bmp", ".gif"]);
@@ -46,6 +46,13 @@ async function extractDocxText(filePath) {
   if (!mammoth) throw new Error("缺少 mammoth 依赖，无法解析 Word（请运行 npm install mammoth）");
   const result = await mammoth.extractRawText({ path: filePath });
   return String((result && result.value) || "");
+}
+
+async function extractDocText(filePath) {
+  const WordExtractor = tryRequire("word-extractor");
+  if (!WordExtractor) throw new Error("缺少 word-extractor 依赖，无法解析旧版 Word（请运行 npm install word-extractor）");
+  const document = await new WordExtractor().extract(filePath);
+  return String((document && document.getBody()) || "");
 }
 
 // 用智谱 GLM-OCR 识别图片 / PDF 为 Markdown 文本（data URL 传文件）
@@ -122,6 +129,7 @@ async function readFileText(filePath) {
   const ext = path.extname(filePath).toLowerCase();
   if (TEXT_EXT.has(ext)) return readText(filePath);
   if (ext === ".docx") return extractDocxText(filePath);
+  if (ext === ".doc") return extractDocText(filePath);
   if (IMAGE_EXT.has(ext)) return extractImageText(filePath);
   if (ext === ".pdf") {
     // 超大 PDF 跳过 pdf-parse 和整文件 Base64，避免解析 50MB+ 扫描书籍时耗尽服务内存。
@@ -232,7 +240,7 @@ async function buildDocument(name, text, embedder = semanticEmbedder) {
 async function ingestFile(kb, filePath, originalName, embedder = semanticEmbedder) {
   const text = await readFileText(filePath);
   if (text == null) {
-    throw new Error(`暂不支持该文件类型：${path.extname(filePath)}（支持纯文本、PDF、Word .docx、图片）`);
+    throw new Error(`暂不支持该文件类型：${path.extname(filePath)}（支持纯文本、PDF、Word .doc/.docx、图片）`);
   }
   if (!String(text).trim()) {
     throw new Error("未能从该文件中提取到文本内容（图片中可能没有可识别的文字）");

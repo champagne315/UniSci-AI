@@ -782,6 +782,7 @@ input:focus-visible, textarea:focus-visible, select:focus-visible {
 .message-image img { display: block; max-width: min(420px, 100%); max-height: 300px; object-fit: contain; }
 .message-file { display: flex; align-items: center; gap: 9px; padding: 9px 11px; border: 1px solid var(--line); border-radius: var(--r); background: var(--surface); color: var(--ink); text-decoration: none; box-shadow: var(--sh-xs); }
 .message-file:hover { border-color: var(--brand); background: var(--brand-soft); }
+.message-file.pending { opacity: .7; cursor: progress; }
 .message-file-icon { width: 26px; height: 26px; display: grid; place-items: center; flex: 0 0 auto; border-radius: 7px; background: var(--brand-soft-2); color: var(--brand-deep); font-weight: var(--w-strong); }
 .message-file span:last-child { display: grid; min-width: 0; gap: 2px; }
 .message-file b { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: var(--t-label); }
@@ -1235,8 +1236,10 @@ input:focus-visible, textarea:focus-visible, select:focus-visible {
 .friends-page { display: grid; gap: 18px; max-width: 1120px; }
 .friends-add-card { padding: 18px 20px; border: 1px solid var(--line-2); border-radius: var(--r-lg); background: var(--surface); }
 .friends-add-title { font-weight: var(--w-strong); margin-bottom: 12px; }
-.friends-cols { display: grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap: 14px; }
+.friends-cols { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 14px; }
 .friends-section { padding: 18px 20px; border: 1px solid var(--line-2); border-radius: var(--r-lg); background: var(--surface); min-width: 0; }
+.friends-suggestions-section { grid-column: 1 / -1; }
+.friends-suggestions-section .friend-list { grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); max-height: 300px; padding-right: 2px; }
 .friends-section-title { font-weight: var(--w-strong); margin-bottom: 12px; }
 .friend-item { display: flex; align-items: center; gap: 10px; padding: 10px 12px; border: 1px solid var(--line-2); border-radius: var(--r-sm); }
 .friend-avatar { width: 34px; height: 34px; flex: 0 0 34px; overflow: hidden; border-radius: 50%; background: var(--surface-2); }
