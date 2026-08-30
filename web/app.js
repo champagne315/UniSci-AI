@@ -419,9 +419,6 @@ function setupAvatarCropper() {
   window.addEventListener("resize", () => { if (avatarCropState) renderAvatarCrop(); });
 }
 
-function openContactModal() { openModal($("contactModal")); }
-function closeContactModal() { closeModal($("contactModal")); }
-
 /* ===== Toast ===== */
 function toast(msg, kind) {
   const stack = $("toastStack");
@@ -2914,11 +2911,6 @@ function bindEvents() {
   });
   $("kbMountBtn").onclick = toggleKbPop;
 
-  // 联系作者
-  $("contactAuthor").onclick = openContactModal;
-  $("contactClose").onclick = closeContactModal;
-  $("contactModal").addEventListener("click", (e) => { if (e.target === $("contactModal")) closeContactModal(); });
-
   // 滚动
   const box = $("chatFeed");
   let raf = null;
@@ -2954,7 +2946,6 @@ function bindEvents() {
       if (!$("kbDrawerMask").classList.contains("hidden")) { closeKbDrawer(); return; }
       if (!$("agentConfigView").classList.contains("hidden")) { closeAgentConfig(); return; }
       if (!$("kbPop").classList.contains("hidden")) { $("kbPop").classList.add("hidden"); return; }
-      if (!$("contactModal").classList.contains("hidden")) { closeContactModal(); return; }
     }
     if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "k") {
       if (state.view === "agents" && !$("agentConfigView").classList.contains("hidden")) return;

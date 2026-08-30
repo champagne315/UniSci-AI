@@ -1580,23 +1580,6 @@ body { letter-spacing: -.006em; }
 }
 .modal-close:hover { background: var(--surface-2); color: var(--ink); }
 
-/* 联系作者 */
-.contact-card {
-  width: auto; max-width: 360px; max-height: 86vh;
-  padding: 16px; background: #FFFFFF;
-  border-radius: 12px;
-  display: flex; align-items: center; justify-content: center;
-}
-.contact-qr-img {
-  display: block; max-width: 100%; max-height: 82vh;
-  width: auto; height: auto;
-  border-radius: 8px; background: #FFFFFF;
-  margin: 0 auto;
-}
-#contactModal.modal {
-  align-items: flex-start;
-  padding-top: max(20px, calc(50vh - 360px));
-}
 .drawer { width: 460px; box-shadow: -12px 0 42px rgba(20,29,26,.13); }
 .toast { border-radius: 8px; }
 
