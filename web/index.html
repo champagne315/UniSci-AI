@@ -15,6 +15,7 @@
       <div class="auth-copy"><h1 id="authTitle">登录</h1></div>
       <form id="authForm" novalidate>
         <label><span>邮箱或手机号</span><input id="authLogin" type="text" autocomplete="username" required /></label>
+        <label id="authNicknameField" class="hidden"><span>昵称 <small>可选</small></span><input id="authNickname" type="text" autocomplete="nickname" maxlength="24" placeholder="不填写则使用账号" /></label>
         <label><span>密码</span><input id="authPassword" type="password" autocomplete="current-password" required /></label>
         <p class="auth-error hidden" id="authError" role="alert"></p>
         <button class="auth-submit" id="authSubmit" type="submit">登录</button>
@@ -616,7 +617,7 @@
 
       <div class="settings-pane" data-settings-view="profile" hidden>
         <p class="settings-kicker">编辑资料</p>
-        <h2>用户名与头像</h2>
+        <h2>昵称与头像</h2>
         <form id="profileForm" novalidate>
           <div class="profile-avatar-row">
             <div class="profile-avatar-preview" id="profileAvatarPreview" aria-hidden="true">—</div>
@@ -626,7 +627,7 @@
               <button class="ghost-btn sm" id="profileAvatarReset" type="button">恢复默认</button>
             </div>
           </div>
-          <label><span>用户名</span><input id="profileName" type="text" autocomplete="off" maxlength="24" required /></label>
+          <label><span>昵称</span><input id="profileName" type="text" autocomplete="nickname" maxlength="24" required /></label>
           <p class="profile-error hidden" id="profileError" role="alert"></p>
           <div class="modal-actions">
             <div></div>

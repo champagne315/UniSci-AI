@@ -460,6 +460,7 @@ function renderAuthMode() {
   $("authSubmit").textContent = registering ? "注册并进入" : "登录";
   $("authSwitch").textContent = registering ? "已有账户？登录" : "没有账户？注册";
   $("authPassword").autocomplete = registering ? "new-password" : "current-password";
+  $("authNicknameField").classList.toggle("hidden", !registering);
   $("authError").classList.add("hidden");
 }
 function setupAuth() {
@@ -467,10 +468,11 @@ function setupAuth() {
   $("authForm").onsubmit = async (event) => {
     event.preventDefault();
     const login = $("authLogin").value.trim(); const password = $("authPassword").value;
+    const nickname = $("authNickname").value.trim();
     const error = $("authError"); error.classList.add("hidden");
     try {
       const endpoint = authMode === "register" ? "/api/auth/register" : "/api/auth/login";
-      const r = await api.post(endpoint, { login, password });
+      const r = await api.post(endpoint, authMode === "register" ? { login, password, nickname } : { login, password });
       state.user = r.user; restoreTheme(); hideAuthGate(); await bootWorkspace();
     } catch (e) { error.textContent = e.message || "操作失败，请重试"; error.classList.remove("hidden"); }
   };
@@ -578,14 +580,14 @@ function setupAuth() {
     const displayName = $("profileName").value.trim();
     const error = $("profileError");
     error.classList.add("hidden");
-    if (!displayName) { error.textContent = "用户名不能为空"; error.classList.remove("hidden"); return; }
+    if (!displayName) { error.textContent = "昵称不能为空"; error.classList.remove("hidden"); return; }
     const preview = $("profileAvatarPreview");
     const uploaded = preview.dataset.uploaded;
     const reset = preview.dataset.reset === "1";
     const avatarUrl = uploaded || (reset ? "" : (state.user && state.user.avatarUrl) || "");
     if (reset) delete preview.dataset.reset;
     try {
-      const r = await api.post("/api/auth/profile", { displayName, avatarUrl });
+      const r = await api.post("/api/auth/profile", { nickname: displayName, avatarUrl });
       state.user = r.user;
       renderSettingsAccount();
       refreshAvatarViews();

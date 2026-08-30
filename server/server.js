@@ -149,7 +149,7 @@ async function handleApi(req, res, parsed) {
   if (pathname === "/api/auth/register" && method === "POST") {
     try {
       const body = await readJson(req);
-      const registeredUser = auth.register(body.login, body.password, res);
+      const registeredUser = auth.register(body.login, body.password, body.nickname ?? body.displayName, res);
       ensureUsaAllUsersGroup();
       defaultKbs.scheduleDefaultKnowledgeBases(registeredUser.id);
       return sendJSON(res, 201, { user: registeredUser });

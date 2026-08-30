@@ -44,6 +44,10 @@ try {
     if (!userCols.includes(column)) db.exec("ALTER TABLE users ADD COLUMN " + column + " TEXT");
   }
 } catch (error) { console.error("[auth] 用户档案迁移失败:", error.message); }
+// 旧版本会将邮箱前缀写作默认显示名；昵称启用后，未自行修改过的旧账号统一回退为完整账号。
+try {
+  db.prepare("UPDATE users SET display_name = login WHERE display_name IS NULL OR trim(display_name) = '' OR (instr(login, '@') > 0 AND display_name = substr(login, 1, instr(login, '@') - 1))").run();
+} catch (error) { console.error("[auth] 旧账号昵称迁移失败:", error.message); }
 // 修复历史版本的截断头像：旧代码会把 data URL 强行截到恰好 200000 字符，文件已不完整，清空后回退默认头像。
 try {
   db.prepare("UPDATE users SET avatar_url = '' WHERE length(avatar_url) = 200000").run();
@@ -83,7 +87,7 @@ function verifyPassword(password, encoded) {
 function publicUser(user) {
   return user ? {
     id: user.id, login: user.login, createdAt: user.created_at,
-    displayName: user.display_name || "",
+    displayName: user.display_name || user.login,
     avatarUrl: user.avatar_url || "",
   } : null;
 }
@@ -109,15 +113,17 @@ function createSession(userId, res) {
     .run(hashToken(token), userId, now + SESSION_TTL_MS, now);
   setCookie(res, token, SESSION_TTL_MS);
 }
-function register(login, password, res) {
+function nicknameValue(value, fallback) {
+  return String(value || "").trim().slice(0, 24) || fallback;
+}
+function register(login, password, displayName, res) {
   const normalized = normalizeLogin(login);
   if (!validLogin(normalized)) throw new Error("请输入有效的邮箱或手机号");
   if (String(password || "").length < 8) throw new Error("密码至少需要 8 位");
   const existing = db.prepare("SELECT id FROM users WHERE login = ?").get(normalized);
   if (existing) throw new Error("该邮箱或手机号已注册");
   const now = Date.now();
-  const initialName = normalized.includes("@") ? normalized.split("@")[0] : normalized;
-  const user = { id: id("user"), login: normalized, password_hash: hashPassword(password), display_name: initialName, avatar_url: "", created_at: now, updated_at: now };
+  const user = { id: id("user"), login: normalized, password_hash: hashPassword(password), display_name: nicknameValue(displayName, normalized), avatar_url: "", created_at: now, updated_at: now };
   db.prepare("INSERT INTO users (id, login, password_hash, display_name, avatar_url, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?)")
     .run(user.id, user.login, user.password_hash, user.display_name, user.avatar_url, user.created_at, user.updated_at);
   createSession(user.id, res);
@@ -126,9 +132,10 @@ function register(login, password, res) {
 function updateProfile(userId, profile) {
   const user = db.prepare("SELECT * FROM users WHERE id = ?").get(userId);
   if (!user) throw new Error("账户不存在");
-  const displayName = String(profile && profile.displayName || "").trim().slice(0, 24);
+  const hasDisplayName = profile && (Object.prototype.hasOwnProperty.call(profile, "displayName") || Object.prototype.hasOwnProperty.call(profile, "nickname"));
+  const displayName = nicknameValue(profile && (profile.nickname ?? profile.displayName), user.login);
   const avatarUrl = String(profile && profile.avatarUrl || "").trim();
-  if (profile && Object.prototype.hasOwnProperty.call(profile, "displayName") && !displayName) throw new Error("用户名不能为空");
+  if (hasDisplayName && !String((profile.nickname ?? profile.displayName) || "").trim()) throw new Error("昵称不能为空");
   // 不能静默截断 base64：截断 JPEG/PNG 会造成只显示半张头像。限制约 2MB 原图的数据 URL。
   if (avatarUrl.length > 2_800_000) throw new Error("头像文件过大，请选择 2MB 以内的图片");
   if (avatarUrl && !/^data:image\/(png|jpe?g|webp|gif);base64,[A-Za-z0-9+/=\s]+$/i.test(avatarUrl)) {
